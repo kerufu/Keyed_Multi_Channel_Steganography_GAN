@@ -39,6 +39,6 @@ regularization_weight = 0.1
 
 kernal_clip_value = 0.05
 
-shuffle_buffer_size_divider = 5
+shuffle_buffer_size_divider = 1
 
 save_iteration = 1
