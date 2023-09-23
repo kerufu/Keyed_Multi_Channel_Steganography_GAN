@@ -128,7 +128,7 @@ class custom_dense(tf.keras.layers.Layer):
         return x
     
 class generator(tf.keras.Model):
-    def __init__(self):
+    def __init__(self, key):
         super(generator, self).__init__()
         self.encoder = [
             custom_conv2d(64, 3),
@@ -136,7 +136,7 @@ class generator(tf.keras.Model):
             custom_conv2d(256, 3),
             custom_conv2d(512, 3),
         ]
-        # self.xor_layer = xor_messages(key)
+        self.xor_layer = xor_messages(key)
         self.concat_layer = image_label_concatenation(setting.image_size//16, 512)
         self.decoder = [
             custom_conv2dtp(256, 3),
@@ -152,8 +152,8 @@ class generator(tf.keras.Model):
             else:
                 image = el(image)
 
-        # for index in range(setting.num_message):
-        #     messages[index] = self.xor_layer(messages[index])
+        for index in range(setting.num_message):
+            messages[index] = self.xor_layer(messages[index])
         messages = tf.cast(tf.concat(messages, 1), tf.float32)
         messages = messages * 2 - 1
         image = self.concat_layer(image, messages)

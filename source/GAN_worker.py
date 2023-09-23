@@ -14,7 +14,7 @@ class GAN_worker():
         self.discriminator_iteration = discriminator_iteration
         self.decoder_iteration = decoder_iteration
 
-        self.generator = GAN_definition.generator()
+        self.generator = GAN_definition.generator(setting.keys[0])
         self.discriminator = GAN_definition.discriminator()
         self.decoders = [GAN_definition.decoder() for _ in range(setting.num_message)]
 
