@@ -112,6 +112,7 @@ class GAN_worker():
         self.decoders_metric[index].update_state(messages[index], decoded_message)
 
     def train(self, epoch, dataset):
+        dataset = dataset.take(100)
         dataset = dataset.shuffle(dataset.cardinality()//setting.shuffle_buffer_size_divider, reshuffle_each_iteration=True).batch(setting.batch_size, drop_remainder=True)
 
         for epoch_num in range(epoch):
