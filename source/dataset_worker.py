@@ -31,7 +31,6 @@ class dataset_worker():
 
         data = np.array(data)
         data = data / 127.5 - 1
-        # data = data[:, :, :, np.newaxis]
         
         dataset = tf.data.Dataset.from_tensor_slices(data)
 

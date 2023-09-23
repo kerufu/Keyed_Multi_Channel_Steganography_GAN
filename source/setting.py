@@ -8,7 +8,7 @@ processed_dataset_path = "processed_dataset/"
 num_message = 2
 
 feature_size = image_size * image_size
-message_size = image_size * image_size // num_message
+message_size = image_size * image_size // 10 // num_message
 
 GAN_pathes = {
     "generator": "saved_model/GAN/generator",
@@ -16,7 +16,7 @@ GAN_pathes = {
     "decoder": "saved_model/GAN/decoder",
 }
 
-batch_size = 64
+batch_size = 50
 
 dropout_ratio = 0.25
 
@@ -30,7 +30,8 @@ label_smoothing_logit_threshold = math.log(label_smoothing_ratio/(1-label_smooth
 
 learning_rate = 0.0001
 gradient_clip_norm = 1.0
+regularization_weight = 0.1
 
 kernal_clip_value = 0.05
 
-shuffle_buffer_size_divider = 5
+shuffle_buffer_size_divider = 1

@@ -28,31 +28,33 @@ class GAN_worker():
             print("GAN model weight not found")
 
         # self.adam = tf.keras.optimizers.Adam(learning_rate=setting.learning_rate, clipnorm=setting.gradient_clip_norm, weight_decay=setting.weight_decay)
-        self.adam = tf.keras.optimizers.legacy.Adam(learning_rate=setting.learning_rate)
-        self.rmsprop = tf.keras.optimizers.RMSprop(learning_rate=setting.learning_rate, clipnorm=setting.gradient_clip_norm, weight_decay=setting.weight_decay)
+        self.generator_opt = tf.keras.optimizers.Adam(learning_rate=setting.learning_rate, clipnorm=setting.gradient_clip_norm, weight_decay=setting.weight_decay)
+        self.discriminator_opt = tf.keras.optimizers.RMSprop(learning_rate=setting.learning_rate, clipnorm=setting.gradient_clip_norm, weight_decay=setting.weight_decay)
+        self.decoder_opt = tf.keras.optimizers.legacy.Adam(learning_rate=setting.learning_rate)
 
-        self.mse = tf.keras.losses.MeanSquaredError()
-        self.bfce = tf.keras.losses.BinaryFocalCrossentropy(from_logits=True, label_smoothing=setting.label_smoothing_ratio)
+        self.generator_loss = tf.keras.losses.MeanSquaredError()
+        self.discriminator_loss = tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=setting.label_smoothing_ratio)
+        self.decoder_loss = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
         self.generator_metric = tf.keras.metrics.MeanSquaredError()
         self.discriminator_metric = tf.keras.metrics.BinaryAccuracy(threshold=0)
-        self.decoders_metric = [tf.keras.metrics.MeanSquaredError() for _ in range(setting.num_message)]
+        self.decoders_metric = [tf.keras.metrics.BinaryAccuracy(threshold=0) for _ in range(setting.num_message)]
 
     def get_generator_loss(self, input_image, output_image, messages, decoded_messages, discriminator_ouput_fake):
-        loss = self.mse(input_image, output_image)
+        loss = self.generator_loss(input_image, output_image)
         for index in range(setting.num_message):
-            loss += self.mse(messages[index], decoded_messages[index])
-        loss += self.bfce(tf.ones_like(discriminator_ouput_fake), discriminator_ouput_fake)
-        loss += tf.add_n(self.generator.losses)
+            loss += self.decoder_loss(messages[index], decoded_messages[index])
+        loss += self.discriminator_loss(tf.ones_like(discriminator_ouput_fake), discriminator_ouput_fake)
+        loss += tf.add_n(self.generator.losses) * setting.regularization_weight
         return loss
     
     def get_discriminator_loss(self, target, output):
-        return self.bfce(target, output) + tf.add_n(self.discriminator.losses)
+        return self.discriminator_loss(target, output) + tf.add_n(self.discriminator.losses) * setting.regularization_weight
     
 
     @tf.function
     def get_decoder_loss(self, message, decoded_message, index):
-        return self.mse(message, decoded_message) + tf.add_n(self.decoders[index].losses)
+        return self.decoder_loss(message, decoded_message) + tf.add_n(self.decoders[index].losses) * setting.regularization_weight
     
     @tf.function
     def train_generator(self, batch):
@@ -69,7 +71,7 @@ class GAN_worker():
             generator_loss = self.get_generator_loss(batch, output_image, messages, decoded_messages, discriminator_ouput_fake)
         
         generator_gradient = generator_tape.gradient(generator_loss, self.generator.trainable_variables)
-        self.adam.apply_gradients(zip(generator_gradient, self.generator.trainable_variables))
+        self.generator_opt.apply_gradients(zip(generator_gradient, self.generator.trainable_variables))
 
         self.generator_metric.update_state(batch, output_image)
 
@@ -81,7 +83,7 @@ class GAN_worker():
             discriminator_loss_true = self.get_discriminator_loss(tf.ones_like(discriminator_ouput_true), discriminator_ouput_true)
 
         discriminator_gradient = discriminator_tape_true.gradient(discriminator_loss_true, self.discriminator.trainable_variables)
-        self.rmsprop.apply_gradients(zip(discriminator_gradient, self.discriminator.trainable_variables))
+        self.discriminator_opt.apply_gradients(zip(discriminator_gradient, self.discriminator.trainable_variables))
 
         with tf.GradientTape() as discriminator_tape_fake:
             messages = [np.random.choice(2, (setting.batch_size, setting.message_size)) for _ in range(setting.num_message)]
@@ -91,7 +93,7 @@ class GAN_worker():
             discriminator_loss_fake = self.get_discriminator_loss(tf.zeros_like(discriminator_ouput_fake), discriminator_ouput_fake)
 
         discriminator_gradient = discriminator_tape_fake.gradient(discriminator_loss_fake, self.discriminator.trainable_variables)
-        self.rmsprop.apply_gradients(zip(discriminator_gradient, self.discriminator.trainable_variables))
+        self.discriminator_opt.apply_gradients(zip(discriminator_gradient, self.discriminator.trainable_variables))
 
         self.discriminator_metric.update_state(tf.ones_like(discriminator_ouput_true), discriminator_ouput_true)
         self.discriminator_metric.update_state(tf.zeros_like(discriminator_ouput_fake), discriminator_ouput_fake)
@@ -106,12 +108,12 @@ class GAN_worker():
             decoder_loss = self.get_decoder_loss(messages[index], decoded_message, index)
 
         decoder_gradient = decoder_tape.gradient(decoder_loss, self.decoders[index].trainable_variables)
-        self.adam.apply_gradients(zip(decoder_gradient, self.decoders[index].trainable_variables))
+        self.decoder_opt.apply_gradients(zip(decoder_gradient, self.decoders[index].trainable_variables))
 
         self.decoders_metric[index].update_state(messages[index], decoded_message)
 
     def train(self, epoch, dataset):
-        dataset = dataset.take(128)
+        dataset = dataset.take(200)
         dataset = dataset.shuffle(dataset.cardinality()//setting.shuffle_buffer_size_divider, reshuffle_each_iteration=True).batch(setting.batch_size, drop_remainder=True)
 
         for epoch_num in range(epoch):
@@ -131,13 +133,14 @@ class GAN_worker():
                         self.train_decoder(batch, index)
 
             for batch in dataset:
-                image = batch[0, :]
-                messages = [np.random.choice(2, (setting.batch_size, setting.message_size)) for _ in range(setting.num_message)]
-                decoded_image = self.generator(batch, messages)[0, :]
+                image = batch[:1, :]
+                messages = [np.random.choice(2, (1, setting.message_size)) for _ in range(setting.num_message)]
+                decoded_image = self.generator(image, messages)
+                decoded_messages = [self.decoders[index](decoded_image) for index in range(setting.num_message)]
                 break
 
-            cv2.imwrite(setting.sample_image, np.array((image+1)*127.5))
-            cv2.imwrite(setting.sample_decoded_image, np.array((decoded_image+1)*127.5))
+            cv2.imwrite(setting.sample_image, np.array((image[0]+1)*127.5))
+            cv2.imwrite(setting.sample_decoded_image, np.array((decoded_image[0]+1)*127.5))
 
             if epoch_num % 10 == 0:
                 if self.generator_iteration:
@@ -153,5 +156,8 @@ class GAN_worker():
             print("Image Reconstruction Loss: " + str(self.generator_metric.result().numpy()))
             print("Discriminator Accuracy: " + str(self.discriminator_metric.result().numpy()))
             for index in range(setting.num_message):
-                print("Message Reconstruction " + str(index+1) + " Loss: " + str(self.decoders_metric[index].result().numpy()))
+                print("Message Reconstruction " + str(index+1) + " Accuracy: " + str(self.decoders_metric[index].result().numpy()))
+
+            print("Sample Messages: " + str(np.array(messages[0][0])[:10]))
+            print("Sample Decoded Messages: " + str(np.array(decoded_messages[0][0])[:10]))
 

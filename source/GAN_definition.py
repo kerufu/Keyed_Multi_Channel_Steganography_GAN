@@ -9,6 +9,19 @@ class ClipConstraint(tf.keras.constraints.Constraint):
     
     def get_config(self):
         return {'kernal_clip_value': setting.kernal_clip_value}
+    
+class image_label_concatenation(tf.keras.layers.Layer):
+    
+    def __init__(self, image_size, image_channel):
+        super(image_label_concatenation, self).__init__()
+        self.image_size = image_size
+        self.image_channel = image_channel
+        self.label_layer = tf.keras.layers.Dense(self.image_size*self.image_size*self.image_channel)
+
+    def call(self, image, label):
+        label = self.label_layer(label)
+        label = tf.reshape(label, (-1, self.image_size, self.image_size, self.image_channel))
+        return tf.concat([image, label], -1)
 
 class custom_conv2d(tf.keras.layers.Layer):
 
@@ -114,12 +127,9 @@ class generator(tf.keras.Model):
             custom_conv2d(128, 5),
             custom_conv2d(256, 3),
             custom_conv2d(512, 3),
-            tf.keras.layers.Flatten(),
-            custom_dense(setting.feature_size, activation="tanh"),
         ]
+        self.concat_layer = image_label_concatenation(setting.image_size//16, 512)
         self.decoder = [
-            custom_dense(setting.image_size*setting.image_size*2),  
-            tf.keras.layers.Reshape((setting.image_size//16, setting.image_size//16, 512)),
             custom_conv2dtp(256, 3),
             custom_conv2dtp(128, 3),
             custom_conv2dtp(64, 5),
@@ -132,8 +142,9 @@ class generator(tf.keras.Model):
                 image = el(image, training)
             else:
                 image = el(image)
-        m = tf.cast(tf.concat(messages, 1), tf.float32)
-        image = tf.concat([m, image], 1)
+        messages = tf.cast(tf.concat(messages, 1), tf.float32)
+        messages = messages * 2 - 1
+        image = self.concat_layer(image, messages)
         for dl in self.decoder:
             if "custom" in dl.name:
                 image = dl(image, training)
@@ -169,7 +180,7 @@ class decoder(tf.keras.Model):
             custom_conv2d(512, 3),
             tf.keras.layers.Flatten(),
             custom_dense(setting.message_size*4),
-            tf.keras.layers.Dense(setting.message_size, activation="tanh")
+            tf.keras.layers.Dense(setting.message_size)
         ]
 
     def call(self, x, training=False):
