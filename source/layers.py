@@ -13,6 +13,7 @@ class ClipConstraint(tf.keras.constraints.Constraint):
 class xor_messages(tf.keras.layers.Layer):
 
     def __init__(self, xor_key):
+        super(xor_messages, self).__init__()
         self.xor_key = xor_key
 
     def call(self, messages):
