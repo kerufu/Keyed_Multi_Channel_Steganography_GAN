@@ -27,7 +27,6 @@ class GAN_worker():
         except:
             print("GAN model weight not found")
 
-        # self.adam = tf.keras.optimizers.Adam(learning_rate=setting.learning_rate, clipnorm=setting.gradient_clip_norm, weight_decay=setting.weight_decay)
         self.generator_opt = tf.keras.optimizers.Adam(learning_rate=setting.learning_rate, clipnorm=setting.gradient_clip_norm, weight_decay=setting.weight_decay)
         self.discriminator_opt = tf.keras.optimizers.RMSprop(learning_rate=setting.learning_rate, clipnorm=setting.gradient_clip_norm, weight_decay=setting.weight_decay)
         self.decoder_opt = tf.keras.optimizers.legacy.Adam(learning_rate=setting.learning_rate)
@@ -141,7 +140,7 @@ class GAN_worker():
             cv2.imwrite(setting.sample_image, np.array((image[0]+1)*127.5))
             cv2.imwrite(setting.sample_decoded_image, np.array((decoded_image[0]+1)*127.5))
 
-            if epoch_num % 10 == 0:
+            if epoch_num % setting.save_iteration == 0:
                 if self.generator_iteration:
                     self.generator.save(setting.GAN_pathes["generator"])
                 if self.discriminator_iteration:
@@ -186,7 +185,6 @@ class GAN_worker():
                 self.decoders_metric[index].update_state(messages[index], decoded_messages[index])
 
             break
-
 
         cv2.imwrite(setting.sample_image, np.array((image[0]+1)*127.5))
         cv2.imwrite(setting.sample_decoded_image, np.array((decoded_image[0]+1)*127.5))
