@@ -14,7 +14,7 @@ class GAN_worker():
         self.discriminator_iteration = discriminator_iteration
         self.decoder_iteration = decoder_iteration
 
-        self.generator = GAN_definition.generator(setting.keys[0])
+        self.generator = GAN_definition.generator()
         self.discriminator = GAN_definition.discriminator()
         self.decoders = [GAN_definition.decoder() for _ in range(setting.num_message)]
 
@@ -112,7 +112,6 @@ class GAN_worker():
         self.decoders_metric[index].update_state(messages[index], decoded_message)
 
     def train(self, epoch, dataset):
-        dataset = dataset.take(100)
         dataset = dataset.shuffle(dataset.cardinality()//setting.shuffle_buffer_size_divider, reshuffle_each_iteration=True).batch(setting.batch_size, drop_remainder=True)
 
         for epoch_num in range(epoch):

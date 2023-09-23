@@ -13,7 +13,6 @@ class ClipConstraint(tf.keras.constraints.Constraint):
 class xor_messages(tf.keras.layers.Layer):
 
     def __init__(self, xor_key):
-        super(xor_messages, self).__init__()
         self.xor_key = xor_key
 
     def call(self, messages):
@@ -25,7 +24,7 @@ class image_label_concatenation(tf.keras.layers.Layer):
         super(image_label_concatenation, self).__init__()
         self.image_size = image_size
         self.image_channel = image_channel
-        self.label_layer = custom_dense(self.image_size*self.image_size*self.image_channel)
+        self.label_layer = tf.keras.layers.Dense(self.image_size*self.image_size*self.image_channel)
 
     def call(self, image, label):
         label = self.label_layer(label)
