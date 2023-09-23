@@ -9,7 +9,15 @@ class ClipConstraint(tf.keras.constraints.Constraint):
     
     def get_config(self):
         return {'kernal_clip_value': setting.kernal_clip_value}
-    
+
+class xor_messages(tf.keras.layers.Layer):
+
+    def __init__(self, xor_key):
+        self.xor_key = xor_key
+
+    def call(self, messages):
+        return tf.bitwise.bitwise_xor(messages, self.xor_key)
+
 class image_label_concatenation(tf.keras.layers.Layer):
     
     def __init__(self, image_size, image_channel):
@@ -128,6 +136,7 @@ class generator(tf.keras.Model):
             custom_conv2d(256, 3),
             custom_conv2d(512, 3),
         ]
+        # self.xor_layer = xor_messages(key)
         self.concat_layer = image_label_concatenation(setting.image_size//16, 512)
         self.decoder = [
             custom_conv2dtp(256, 3),
@@ -142,6 +151,9 @@ class generator(tf.keras.Model):
                 image = el(image, training)
             else:
                 image = el(image)
+
+        # for index in range(setting.num_message):
+        #     messages[index] = self.xor_layer(messages[index])
         messages = tf.cast(tf.concat(messages, 1), tf.float32)
         messages = messages * 2 - 1
         image = self.concat_layer(image, messages)

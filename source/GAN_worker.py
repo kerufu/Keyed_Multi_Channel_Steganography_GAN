@@ -113,7 +113,6 @@ class GAN_worker():
         self.decoders_metric[index].update_state(messages[index], decoded_message)
 
     def train(self, epoch, dataset):
-        dataset = dataset.take(200)
         dataset = dataset.shuffle(dataset.cardinality()//setting.shuffle_buffer_size_divider, reshuffle_each_iteration=True).batch(setting.batch_size, drop_remainder=True)
 
         for epoch_num in range(epoch):
@@ -160,4 +159,43 @@ class GAN_worker():
 
             print("Sample Messages: " + str(np.array(messages[0][0])[:10]))
             print("Sample Decoded Messages: " + str(np.array(decoded_messages[0][0])[:10]))
+
+    def test(self, dataset):
+        dataset = dataset.take(setting.batch_size).batch(setting.batch_size, drop_remainder=True)
+
+        self.generator_metric.reset_state()
+        self.discriminator_metric.reset_state()
+        for index in range(setting.num_message):
+            self.decoders_metric[index].reset_state()
+
+        for batch in dataset:
+            image = batch[:1, :]
+            messages = [np.random.choice(2, (1, setting.message_size)) for _ in range(setting.num_message)]
+            decoded_image = self.generator(image, messages)
+            decoded_messages = [self.decoders[index](decoded_image) for index in range(setting.num_message)]
+
+            discriminator_ouput_true = self.discriminator(batch)
+            discriminator_ouput_fake = self.discriminator(decoded_image)
+            
+            self.generator_metric.update_state(batch, decoded_image)
+
+            self.discriminator_metric.update_state(tf.ones_like(discriminator_ouput_true), discriminator_ouput_true)
+            self.discriminator_metric.update_state(tf.zeros_like(discriminator_ouput_fake), discriminator_ouput_fake)
+
+            for index in range(setting.num_message):
+                self.decoders_metric[index].update_state(messages[index], decoded_messages[index])
+
+            break
+
+
+        cv2.imwrite(setting.sample_image, np.array((image[0]+1)*127.5))
+        cv2.imwrite(setting.sample_decoded_image, np.array((decoded_image[0]+1)*127.5))
+
+        print("Image Reconstruction Loss: " + str(self.generator_metric.result().numpy()))
+        print("Discriminator Accuracy: " + str(self.discriminator_metric.result().numpy()))
+        for index in range(setting.num_message):
+            print("Message Reconstruction " + str(index+1) + " Accuracy: " + str(self.decoders_metric[index].result().numpy()))
+
+        print("Sample Messages: " + str(np.array(messages[0][0])[:10]))
+        print("Sample Decoded Messages: " + str(np.array(decoded_messages[0][0])[:10]))
 

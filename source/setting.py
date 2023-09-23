@@ -8,7 +8,12 @@ processed_dataset_path = "processed_dataset/"
 num_message = 2
 
 feature_size = image_size * image_size
-message_size = image_size * image_size // 10 // num_message
+message_size = feature_size // 10 // num_message
+
+keys = [
+    [0] * (message_size - 1) + [0],
+    [0] * (message_size - 1) + [1],
+]
 
 GAN_pathes = {
     "generator": "saved_model/GAN/generator",
@@ -34,4 +39,4 @@ regularization_weight = 0.1
 
 kernal_clip_value = 0.05
 
-shuffle_buffer_size_divider = 1
+shuffle_buffer_size_divider = 5
