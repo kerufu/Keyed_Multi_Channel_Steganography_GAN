@@ -1,3 +1,6 @@
+import os
+os.chdir("..")
+
 import dataset_worker
 import GAN_worker
 
