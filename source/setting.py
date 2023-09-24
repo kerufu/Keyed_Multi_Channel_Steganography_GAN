@@ -31,11 +31,10 @@ sample_image = "sample_image.jpg"
 sample_decoded_image = "sample_decoded_image.jpg"
 
 label_smoothing_ratio = 0.1
-label_smoothing_logit_threshold = math.log(label_smoothing_ratio/(1-label_smoothing_ratio))
 
 learning_rate = 0.0001
 gradient_clip_norm = 1.0
-regularization_weight = 0.1
+regularization_weight = 0
 
 kernal_clip_value = 0.05
 

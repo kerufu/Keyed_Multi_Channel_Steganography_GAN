@@ -27,8 +27,12 @@ class GAN_worker():
         except:
             print("GAN model weight not found")
 
-        self.generator_opt = tf.keras.optimizers.Adam(learning_rate=setting.learning_rate, clipnorm=setting.gradient_clip_norm, weight_decay=setting.weight_decay)
-        self.discriminator_opt = tf.keras.optimizers.RMSprop(learning_rate=setting.learning_rate, clipnorm=setting.gradient_clip_norm, weight_decay=setting.weight_decay)
+        # self.generator_opt = tf.keras.optimizers.Adam(learning_rate=setting.learning_rate, clipnorm=setting.gradient_clip_norm, weight_decay=setting.weight_decay)
+        # self.discriminator_opt = tf.keras.optimizers.RMSprop(learning_rate=setting.learning_rate, clipnorm=setting.gradient_clip_norm, weight_decay=setting.weight_decay)
+        # self.decoder_opt = tf.keras.optimizers.legacy.Adam(learning_rate=setting.learning_rate)
+
+        self.generator_opt = tf.keras.optimizers.Adam(learning_rate=setting.learning_rate)
+        self.discriminator_opt = tf.keras.optimizers.RMSprop(learning_rate=setting.learning_rate)
         self.decoder_opt = tf.keras.optimizers.legacy.Adam(learning_rate=setting.learning_rate)
 
         self.generator_loss = tf.keras.losses.MeanSquaredError()
@@ -41,8 +45,10 @@ class GAN_worker():
 
     def get_generator_loss(self, input_image, output_image, messages, decoded_messages, discriminator_ouput_fake):
         loss = self.generator_loss(input_image, output_image)
+        decoders_loss = 0
         for index in range(setting.num_message):
-            loss += self.decoder_loss(messages[index], decoded_messages[index])
+            decoders_loss += self.decoder_loss(messages[index], decoded_messages[index])
+        loss += decoders_loss / setting.num_message
         loss += self.discriminator_loss(tf.ones_like(discriminator_ouput_fake), discriminator_ouput_fake)
         loss += tf.add_n(self.generator.losses) * setting.regularization_weight
         return loss
