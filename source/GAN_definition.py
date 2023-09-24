@@ -7,13 +7,19 @@ class generator(tf.keras.Model):
     def __init__(self, key):
         super(generator, self).__init__()
         self.input_module = [
-            custom_conv2d(128, 5),
+            custom_conv2d(64, 3),
+            custom_conv2d(128, 3),
+            custom_conv2d(256, 3),
+            custom_conv2d(512, 3),
         ]
         self.xor_layer = xor_messages(key)
         self.concat_layer = image_label_concatenation(setting.image_size, 3)
         self.output_module = [
-            custom_conv2d(128, 5),
-            custom_conv2d(3, 3),
+            custom_conv2d(512, 3),
+            custom_conv2d(256, 3),
+            custom_conv2d(128, 3),
+            custom_conv2d(64, 3),
+            tf.keras.layers.Conv2D(3, 3, strides=1, padding='same', activation="tanh")
         ]
 
     def call(self, image, messages, training=False):
@@ -29,7 +35,7 @@ class generator(tf.keras.Model):
         messages = tf.cast(tf.concat(messages, 1), tf.float32)
         messages = messages * 2 - 1
         image = self.concat_layer(image, messages)
-        
+
         for ol in self.output_module:
             if "custom" in ol.name:
                 image = ol(image, training)
