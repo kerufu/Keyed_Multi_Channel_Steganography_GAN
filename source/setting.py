@@ -11,14 +11,14 @@ feature_size = image_size * image_size
 message_size = feature_size // 10 // num_message
 
 keys = [
-    [0] * (message_size - 1) + [0],
-    [0] * (message_size - 1) + [1],
+    [0] * message_size,
+    [0, 1] * (message_size // 2),
 ]
 
 GAN_pathes = {
-    "generator": "saved_model/GAN/generator",
-    "discriminator": "saved_model/GAN/discriminator",
-    "decoder": "saved_model/GAN/decoder",
+    "generator": "saved_model/saved_model/GAN/generator",
+    "discriminator": "saved_model/saved_model/GAN/discriminator",
+    "decoder": "saved_model/saved_model/GAN/decoder",
 }
 
 batch_size = 50
