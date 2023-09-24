@@ -1,0 +1,1 @@
+docker cp ./source fer:/fer/ste

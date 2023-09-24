@@ -7,17 +7,12 @@ class generator(tf.keras.Model):
     def __init__(self, key):
         super(generator, self).__init__()
         self.input_module = [
-            custom_conv2d(64, 3),
-            custom_conv2d(128, 3),
-            custom_conv2d(256, 3),
-            custom_conv2d(512, 3),
+            custom_conv2d(64, 3)
         ]
         self.xor_layer = xor_messages(key)
         self.concat_layer = image_label_concatenation(setting.image_size, 3)
         self.output_module = [
-            custom_conv2d(512, 3),
-            custom_conv2d(256, 3),
-            custom_conv2d(128, 3),
+            custom_conv2d(64, 3),
             custom_conv2d(64, 3),
             tf.keras.layers.Conv2D(3, 3, strides=1, padding='same', activation="tanh")
         ]
@@ -67,7 +62,6 @@ class decoder(tf.keras.Model):
         self.model = [
             custom_conv2d(64, 5, scale_down=True),
             custom_conv2d(128, 3, scale_down=True),
-            custom_conv2d(256, 2, scale_down=True),
             tf.keras.layers.Flatten(),
             custom_dense(setting.message_size*4),
             tf.keras.layers.Dense(setting.message_size)
