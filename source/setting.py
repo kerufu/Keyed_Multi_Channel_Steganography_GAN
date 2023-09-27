@@ -11,8 +11,8 @@ feature_size = image_size * image_size
 message_size = feature_size // 10 // num_message
 
 keys = [
-    [0] * (message_size - 1) + [0],
-    [0] * (message_size - 1) + [1],
+    [0] * message_size,
+    [0, 1] * (message_size // 2),
 ]
 
 GAN_pathes = {

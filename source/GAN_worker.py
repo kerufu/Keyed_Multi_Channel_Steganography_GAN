@@ -14,7 +14,7 @@ class GAN_worker():
         self.discriminator_iteration = discriminator_iteration
         self.decoder_iteration = decoder_iteration
 
-        self.generator = GAN_definition.generator(setting.keys[0])
+        self.generator = GAN_definition.generator(setting.keys[1])
         self.discriminator = GAN_definition.discriminator()
         self.decoders = [GAN_definition.decoder() for _ in range(setting.num_message)]
 
@@ -26,10 +26,6 @@ class GAN_worker():
             print("GAN model weight loaded")
         except:
             print("GAN model weight not found")
-
-        # self.generator_opt = tf.keras.optimizers.Adam(learning_rate=setting.learning_rate, clipnorm=setting.gradient_clip_norm, weight_decay=setting.weight_decay)
-        # self.discriminator_opt = tf.keras.optimizers.RMSprop(learning_rate=setting.learning_rate, clipnorm=setting.gradient_clip_norm, weight_decay=setting.weight_decay)
-        # self.decoder_opt = tf.keras.optimizers.legacy.Adam(learning_rate=setting.learning_rate)
 
         self.generator_opt = tf.keras.optimizers.Adam(learning_rate=setting.learning_rate)
         self.discriminator_opt = tf.keras.optimizers.RMSprop(learning_rate=setting.learning_rate)
