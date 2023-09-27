@@ -7,6 +7,7 @@ import cv2
 
 import GAN_definition
 import setting
+import dataset_worker
 
 class GAN_worker():
     def __init__(self, generator_iteration=1, discriminator_iteration=1, decoder_iteration=1) -> None:
@@ -14,7 +15,7 @@ class GAN_worker():
         self.discriminator_iteration = discriminator_iteration
         self.decoder_iteration = decoder_iteration
 
-        self.generator = GAN_definition.generator(setting.keys[1])
+        self.generator = GAN_definition.generator(setting.keys[0])
         self.discriminator = GAN_definition.discriminator()
         self.decoders = [GAN_definition.decoder() for _ in range(setting.num_message)]
 
@@ -162,8 +163,9 @@ class GAN_worker():
             print("Sample Messages: " + str(np.array(messages[0][0])[:10]))
             print("Sample Decoded Messages: " + str(np.array(decoded_messages[0][0])[:10]))
 
-    def test(self, dataset):
-        dataset = dataset.take(setting.batch_size).batch(setting.batch_size, drop_remainder=True)
+    def evaluate(self, dataset):
+        dataset = dataset.take(setting.batch_size)
+        dataset = dataset.shuffle(dataset.cardinality()).batch(setting.batch_size, drop_remainder=True)
 
         self.generator_metric.reset_state()
         self.discriminator_metric.reset_state()
@@ -199,4 +201,6 @@ class GAN_worker():
 
         print("Sample Messages: " + str(np.array(messages[0][0])[:10]))
         print("Sample Decoded Messages: " + str(np.array(decoded_messages[0][0])[:10]))
+
+
 

@@ -27,8 +27,8 @@ dropout_ratio = 0.25
 
 weight_decay = None
 
-sample_image = "sample_image.jpg"
-sample_decoded_image = "sample_decoded_image.jpg"
+sample_image = "sample_image.png"
+sample_decoded_image = "sample_decoded_image.png"
 
 label_smoothing_ratio = 0.1
 
