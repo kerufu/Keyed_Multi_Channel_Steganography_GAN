@@ -38,14 +38,14 @@ def decrypt(image_path):
 
 
 # ganw.train(50000, dw.dataset)
-ganw.evaluate(dw.dataset)
+# ganw.evaluate(dw.dataset)
 
-# encrypt(
-#     "/Users/richard/Documents/Codebase/Github/Keyed_Multi_Channel_Steganography_GAN/dataset/101010.jpg",
-#     [
-#         [0, 1, 0, 0, 1, 1],
-#         [1, 0, 1, 1, 0] * (setting.message_size // 3)
-#     ]
-#     )
+encrypt(
+    "./dataset/101010.jpg",
+    [
+        [0, 1, 0, 0, 1, 1],
+        [1, 0, 1, 1, 0] * (setting.message_size // 3)
+    ]
+)
 
-# decrypt(setting.sample_decoded_image)
+decrypt(setting.sample_decoded_image)
