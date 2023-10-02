@@ -5,10 +5,11 @@ image_size = 64
 dataset_path = "dataset/"
 processed_dataset_path = "processed_dataset/"
 
-num_message = 2
+num_message_channel = 4
 
-feature_size = image_size * image_size
-message_size = feature_size // 10 // num_message
+message_bit_per_pixel = 1
+totoal_message_size = int(image_size*image_size*message_bit_per_pixel)
+message_size = totoal_message_size // num_message_channel
 
 keys = [
     [0] * message_size,
@@ -25,7 +26,6 @@ batch_size = 50
 
 dropout_ratio = 0.25
 
-weight_decay = None
 
 sample_image = "sample_image.png"
 sample_decoded_image = "sample_decoded_image.png"
@@ -33,11 +33,13 @@ sample_decoded_image = "sample_decoded_image.png"
 label_smoothing_ratio = 0.1
 
 learning_rate = 0.0001
-gradient_clip_norm = 1.0
+gradient_clip_norm = None
+weight_decay = None
+
 regularization_weight = 0
+mse_weight = 100
 
 kernal_clip_value = 0.05
 
 shuffle_buffer_size_divider = 1
 
-save_iteration = 1

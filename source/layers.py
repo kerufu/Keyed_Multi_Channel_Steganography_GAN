@@ -2,8 +2,15 @@ import tensorflow as tf
 
 import setting
 
+class WassersteinLoss(tf.keras.losses.Loss):
+    def __init__(self):
+        super(WassersteinLoss, self).__init__()
+
+    def call(self, y_true, y_pred):
+        y_true = y_true * 2 - 1
+        return -tf.math.reduce_mean(y_true*y_pred)
+
 class ClipConstraint(tf.keras.constraints.Constraint):
-    
     def __call__(self, weights):
         return tf.keras.backend.clip(weights, -setting.kernal_clip_value, setting.kernal_clip_value)
     
@@ -19,19 +26,25 @@ class xor_messages(tf.keras.layers.Layer):
     def call(self, messages):
         return tf.bitwise.bitwise_xor(messages, self.xor_key)
 
-class image_label_concatenation(tf.keras.layers.Layer):
+class image_message_concatenation(tf.keras.layers.Layer):
     
-    def __init__(self, image_size, image_channel):
-        super(image_label_concatenation, self).__init__()
+    def __init__(self, image_size):
+        super(image_message_concatenation, self).__init__()
         self.image_size = image_size
-        self.image_channel = image_channel
-        self.label_layer = tf.keras.layers.Dense(self.image_size*self.image_size*self.image_channel)
+        self.arbitary_message_length = not isinstance(setting.message_bit_per_pixel, int)
+        if self.arbitary_message_length:
+            self.message_layer = custom_dense(self.image_size*self.image_size*(int(setting.message_bit_per_pixel)+1))
 
-    def call(self, image, label):
-        label = self.label_layer(label)
-        label = tf.reshape(label, (-1, self.image_size, self.image_size, self.image_channel))
-        return tf.concat([image, label], -1)
-
+    def call(self, image, messages):
+        message = tf.cast(tf.concat(messages, 1), tf.float32)
+        message = message * 2 - 1
+        if self.arbitary_message_length:
+            message = self.message_layer(message)
+            message = tf.reshape(message, (-1, self.image_size, self.image_size, int(setting.message_bit_per_pixel)+1))
+        else:
+            message = tf.reshape(message, (-1, self.image_size, self.image_size, setting.message_bit_per_pixel))
+        return tf.concat([image, message], -1)
+    
 class custom_conv2d(tf.keras.layers.Layer):
 
     def __init__(self, num_channel, kernel_size, scale_down=False, maxpooling=False, clip_kernal=False, dropout=False, activation="leaky_relu"):
@@ -57,43 +70,9 @@ class custom_conv2d(tf.keras.layers.Layer):
             ]
 
         self.model += [
-            tf.keras.layers.BatchNormalization(),
-            tf.keras.layers.Activation(activation)
-        ]
-        if dropout:
-            self.model.append(tf.keras.layers.Dropout(setting.dropout_ratio))
-
-    def call(self, x, training):
-        for layer in self.model:
-            if "dropout" in layer.name or "batch_normalization" in layer.name:
-                x = layer(x, training)
-            else:
-                x = layer(x)
-        return x
-    
-class custom_conv2dtp(tf.keras.layers.Layer):
-
-    def __init__(self, num_channel, kernel_size, scale_up=False, clip_kernal=False, dropout=False, activation="leaky_relu"):
-        super(custom_conv2dtp, self).__init__()
-
-        kernel_constraint = None
-        if clip_kernal:
-            kernel_constraint = ClipConstraint()
-
-        if scale_up:
-            self.model = [
-                tf.keras.layers.Conv2DTranspose(num_channel, kernel_size, strides=2, padding='same', kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
-            ]
-        else:
-            self.model = [
-                tf.keras.layers.Conv2DTranspose(num_channel, kernel_size, strides=1, padding='same', kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
-            ]
-
-        self.model += [
-            tf.keras.layers.BatchNormalization(),
             tf.keras.layers.Activation(activation),
+            tf.keras.layers.BatchNormalization()
         ]
-
         if dropout:
             self.model.append(tf.keras.layers.Dropout(setting.dropout_ratio))
 
@@ -116,8 +95,8 @@ class custom_dense(tf.keras.layers.Layer):
 
         self.model = [
             tf.keras.layers.Dense(output_size, kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
-            tf.keras.layers.BatchNormalization(),
-            tf.keras.layers.Activation(activation)
+            tf.keras.layers.Activation(activation),
+            tf.keras.layers.BatchNormalization()
         ]
         if dropout:
             self.model.append(tf.keras.layers.Dropout(setting.dropout_ratio))
@@ -129,4 +108,3 @@ class custom_dense(tf.keras.layers.Layer):
             else:
                 x = layer(x)
         return x
-    

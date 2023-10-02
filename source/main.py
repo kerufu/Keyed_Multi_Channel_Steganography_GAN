@@ -16,7 +16,7 @@ def encrypt(image_path, messages):
     img = np.array(img)
     img = img / 127.5 - 1
 
-    for index in range(setting.num_message):
+    for index in range(setting.num_message_channel):
         if len(messages[index]) < setting.message_size:
             messages[index] += [0] * (setting.message_size - len(messages[index]))
         elif len(messages[index]) > setting.message_size:
@@ -33,19 +33,20 @@ def decrypt(image_path):
     img = np.array(img)
     img = img / 127.5 - 1
 
-    for index in range(setting.num_message):
+    for index in range(setting.num_message_channel):
         print(ganw.decoders[index](img))
 
 
-# ganw.train(50000, dw.dataset)
+ganw.train(50000, dw.dataset)
+
 # ganw.evaluate(dw.dataset)
 
-encrypt(
-    "./dataset/101010.jpg",
-    [
-        [0, 1, 0, 0, 1, 1],
-        [1, 0, 1, 1, 0] * (setting.message_size // 3)
-    ]
-)
+# encrypt(
+#     "./dataset/101010.jpg",
+#     [
+#         [0, 1, 0, 0, 1, 1],
+#         [1, 0, 1, 1, 0] * (setting.message_size // 3)
+#     ]
+# )
 
-decrypt(setting.sample_decoded_image)
+# decrypt(setting.sample_decoded_image)

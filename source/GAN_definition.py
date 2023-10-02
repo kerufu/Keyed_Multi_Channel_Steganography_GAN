@@ -1,53 +1,45 @@
 import tensorflow as tf
 
 import setting
-from layers import custom_conv2d, custom_dense, image_label_concatenation, xor_messages
+from layers import custom_conv2d, image_message_concatenation, xor_messages
 
 class generator(tf.keras.Model):
     def __init__(self, key):
         super(generator, self).__init__()
         self.input_module = [
-            custom_conv2d(64, 3),
+            custom_conv2d(32, 3),
         ]
         self.xor_layer = xor_messages(key)
-        self.concat_layer = image_label_concatenation(setting.image_size, 3)
+        self.concat_layer = image_message_concatenation(setting.image_size)
         self.output_module = [
-            custom_conv2d(128, 3),
-            custom_conv2d(256, 3),
-            custom_conv2d(128, 3),
-            custom_conv2d(64, 3),
+            custom_conv2d(32, 3),
+            custom_conv2d(32, 3),
             tf.keras.layers.Conv2D(3, 3, strides=1, padding='same', activation="tanh")
         ]
 
     def call(self, image, messages, training=False):
-        for il in self.input_module:
-            if "custom" in il.name:
-                image = il(image, training)
-            else:
-                image = il(image)
+
+        middle_features = []
+        middle_features.append(self.input_module[0](image, training))
 
         messages = messages.copy()
-        for index in range(setting.num_message):
+        for index in range(setting.num_message_channel):
             messages[index] = self.xor_layer(messages[index])
-        messages = tf.cast(tf.concat(messages, 1), tf.float32)
-        messages = messages * 2 - 1
-        image = self.concat_layer(image, messages)
+        middle_features[-1] = self.concat_layer(middle_features[-1], messages) # a, M
 
-        for ol in self.output_module:
-            if "custom" in ol.name:
-                image = ol(image, training)
-            else:
-                image = ol(image)
-        return image
+        middle_features.append(self.output_module[0](middle_features[-1], training)) # a, M, b
+        middle_features.append(self.output_module[1](tf.concat(middle_features, -1), training)) # a, M, b, c
+        middle_features.append(self.output_module[2](tf.concat(middle_features, -1))) # a, M, b, c, Eb
+        return tf.clip_by_value(image+middle_features[-1], clip_value_min=-1, clip_value_max=1)
 
 class discriminator(tf.keras.Model):
     def __init__(self):
         super(discriminator, self).__init__()
         self.model = [
-            custom_conv2d(64, 5, scale_down=True),
-            custom_conv2d(128, 3, scale_down=True),
-            tf.keras.layers.Flatten(),
-            tf.keras.layers.Dense(1)
+            custom_conv2d(32, 3),
+            custom_conv2d(32, 3),
+            custom_conv2d(32, 3),
+            tf.keras.layers.Conv2D(1, 3, strides=1, padding='same')
         ]
 
     def call(self, x, training=False):
@@ -56,22 +48,30 @@ class discriminator(tf.keras.Model):
                 x = layer(x, training)
             else:
                 x = layer(x)
-        return x
+        return tf.reduce_mean(x, axis=[1, 2, 3])
     
 class decoder(tf.keras.Model):
     def __init__(self):
         super(decoder, self).__init__()
-        self.model = [
-            custom_conv2d(64, 5, scale_down=True),
-            custom_conv2d(128, 3, scale_down=True),
-            custom_conv2d(256, 2, scale_down=True),
+        self.input_module = [   
+            custom_conv2d(32, 3),
+            custom_conv2d(32, 3),
+            custom_conv2d(32, 3),
+            custom_conv2d(32, 3),
+        ]
+        self.output_module = [
             tf.keras.layers.Flatten(),
-            custom_dense(setting.message_size*4),
             tf.keras.layers.Dense(setting.message_size)
         ]
 
     def call(self, x, training=False):
-        for layer in self.model:
+        middle_features = []
+        middle_features.append(self.input_module[0](x, training))
+        middle_features.append(self.input_module[1](middle_features[0], training))
+        middle_features.append(self.input_module[2](tf.concat(middle_features, -1), training))
+        x = self.input_module[3](tf.concat(middle_features, -1), training)
+
+        for layer in self.output_module:
             if "custom" in layer.name:
                 x = layer(x, training)
             else:
