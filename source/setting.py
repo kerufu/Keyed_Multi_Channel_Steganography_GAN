@@ -39,7 +39,7 @@ weight_decay = None
 regularization_weight = 0
 mse_weight = 100
 
-kernal_clip_value = 0.05
+kernal_clip_value = 0.1
 
 shuffle_buffer_size_divider = 1
 

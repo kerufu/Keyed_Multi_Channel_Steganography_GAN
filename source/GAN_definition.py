@@ -1,20 +1,22 @@
 import tensorflow as tf
 
 import setting
-from layers import custom_conv2d, image_message_concatenation, xor_messages
+import layers
 
 class generator(tf.keras.Model):
-    def __init__(self, key):
+    def __init__(self, key, sum_residual=True):
         super(generator, self).__init__()
+        self.sum_residual = sum_residual
         self.input_module = [
-            custom_conv2d(32, 3),
+            layers.custom_conv2d(32, 3, reflect_padding=True),
         ]
-        self.xor_layer = xor_messages(key)
-        self.concat_layer = image_message_concatenation(setting.image_size)
+        self.xor_layer = layers.xor_messages(key)
+        self.concat_layer = layers.image_message_concatenation(setting.image_size)
         self.output_module = [
-            custom_conv2d(32, 3),
-            custom_conv2d(32, 3),
-            tf.keras.layers.Conv2D(3, 3, strides=1, padding='same', activation="tanh")
+            layers.custom_conv2d(32, 3, reflect_padding=True),
+            layers.custom_conv2d(32, 3, reflect_padding=True),
+            layers.reflect_padding_layer(3), 
+            tf.keras.layers.Conv2D(3, 3, activation="tanh")
         ]
 
     def call(self, image, messages, training=False):
@@ -29,17 +31,21 @@ class generator(tf.keras.Model):
 
         middle_features.append(self.output_module[0](middle_features[-1], training)) # a, M, b
         middle_features.append(self.output_module[1](tf.concat(middle_features, -1), training)) # a, M, b, c
-        middle_features.append(self.output_module[2](tf.concat(middle_features, -1))) # a, M, b, c, Eb
-        return tf.clip_by_value(image+middle_features[-1], clip_value_min=-1, clip_value_max=1)
+        middle_features.append(self.output_module[3](self.output_module[2](tf.concat(middle_features, -1)))) # a, M, b, c, Eb
+
+        if self.sum_residual:
+            return tf.clip_by_value(image+middle_features[-1], clip_value_min=-1, clip_value_max=1)
+        else:
+            return image + middle_features[-1] / 2
 
 class discriminator(tf.keras.Model):
     def __init__(self):
         super(discriminator, self).__init__()
         self.model = [
-            custom_conv2d(32, 3),
-            custom_conv2d(32, 3),
-            custom_conv2d(32, 3),
-            tf.keras.layers.Conv2D(1, 3, strides=1, padding='same')
+            layers.custom_conv2d(32, 3, clip_kernal=True),
+            layers.custom_conv2d(32, 3, clip_kernal=True),
+            layers.custom_conv2d(32, 3, clip_kernal=True),
+            tf.keras.layers.Conv2D(1, 3, strides=1, padding='same', kernel_constraint=layers.ClipConstraint())
         ]
 
     def call(self, x, training=False):
@@ -54,10 +60,10 @@ class decoder(tf.keras.Model):
     def __init__(self):
         super(decoder, self).__init__()
         self.input_module = [   
-            custom_conv2d(32, 3),
-            custom_conv2d(32, 3),
-            custom_conv2d(32, 3),
-            custom_conv2d(32, 3),
+            layers.custom_conv2d(32, 3),
+            layers.custom_conv2d(32, 3),
+            layers.custom_conv2d(32, 3),
+            layers.custom_conv2d(32, 3),
         ]
         self.output_module = [
             tf.keras.layers.Flatten(),

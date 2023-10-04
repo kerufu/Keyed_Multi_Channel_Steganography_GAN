@@ -40,7 +40,7 @@ class GAN_worker():
         self.decoder_loss = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
         self.generator_metric = tf.keras.metrics.MeanSquaredError()
-        self.discriminator_metric = tf.keras.metrics.BinaryAccuracy(threshold=0)
+        self.discriminator_metric = tf.keras.metrics.BinaryAccuracy(threshold=0) # for convenience, handle wgan score in the same way as logit, which may not be true
         self.decoders_metric = [tf.keras.metrics.BinaryAccuracy(threshold=0) for _ in range(setting.num_message_channel)]
 
     def get_generator_loss(self, input_image, output_image, messages, decoded_messages, discriminator_ouput_fake):

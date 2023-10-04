@@ -44,30 +44,57 @@ class image_message_concatenation(tf.keras.layers.Layer):
         else:
             message = tf.reshape(message, (-1, self.image_size, self.image_size, setting.message_bit_per_pixel))
         return tf.concat([image, message], -1)
-    
+
+class reflect_padding_layer(tf.keras.layers.Layer): # O=[(W−K+P)/S]+1
+    def __init__(self, kernel_size):
+        super(reflect_padding_layer, self).__init__()
+        pad = kernel_size - 1
+        self.upper_pad = pad // 2
+        self.lower_pad = pad - self.upper_pad
+
+    def call(self, x):
+        return tf.pad(x, [[0, 0], [self.upper_pad, self.lower_pad], [self.upper_pad, self.lower_pad], [0, 0]], 'REFLECT')
+
 class custom_conv2d(tf.keras.layers.Layer):
 
-    def __init__(self, num_channel, kernel_size, scale_down=False, maxpooling=False, clip_kernal=False, dropout=False, activation="leaky_relu"):
+    def __init__(self, num_channel, kernel_size, reflect_padding=False, scale_down_mode=0, clip_kernal=False, dropout=False, activation="leaky_relu"):
         super(custom_conv2d, self).__init__()
 
         kernel_constraint = None
         if clip_kernal:
             kernel_constraint = ClipConstraint()
 
-        if scale_down:
-            if maxpooling:
+        if reflect_padding:
+            if scale_down_mode == 0:
+                self.model = [
+                    reflect_padding_layer(kernel_size),
+                    tf.keras.layers.Conv2D(num_channel, kernel_size, kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
+                ]
+            elif scale_down_mode == 1:
+                self.model = [
+                    reflect_padding_layer(kernel_size),
+                    tf.keras.layers.Conv2D(num_channel, kernel_size, strides=2, kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
+                ]
+            elif scale_down_mode == 2:
+                self.model = [
+                    reflect_padding_layer(kernel_size),
+                    tf.keras.layers.Conv2D(num_channel, kernel_size, kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
+                    tf.keras.layers.MaxPool2D(),
+                ]
+        else:
+            if scale_down_mode == 0:
+                self.model = [
+                    tf.keras.layers.Conv2D(num_channel, kernel_size, padding='same', kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
+                ]
+            elif scale_down_mode == 1:
+                self.model = [
+                    tf.keras.layers.Conv2D(num_channel, kernel_size, strides=2, padding='same', kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
+                ]
+            elif scale_down_mode == 2:
                 self.model = [
                     tf.keras.layers.Conv2D(num_channel, kernel_size, padding='same', kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
                     tf.keras.layers.MaxPool2D(),
                 ]
-            else:
-                self.model = [
-                    tf.keras.layers.Conv2D(num_channel, kernel_size, strides=2, padding='same', kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
-                ]
-        else:
-            self.model = [
-                tf.keras.layers.Conv2D(num_channel, kernel_size, strides=1, padding='same', kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
-            ]
 
         self.model += [
             tf.keras.layers.Activation(activation),
