@@ -17,10 +17,10 @@ def encrypt(image_path, messages):
     img = img / 127.5 - 1
 
     for index in range(setting.num_message_channel):
-        if len(messages[index]) < setting.message_size:
-            messages[index] += [0] * (setting.message_size - len(messages[index]))
-        elif len(messages[index]) > setting.message_size:
-            messages[index] = messages[index][:setting.message_size]
+        if len(messages[index]) < setting.data_bit_size_per_window:
+            messages[index] += [0] * (setting.data_bit_size_per_window - len(messages[index]))
+        elif len(messages[index]) > setting.data_bit_size_per_window:
+            messages[index] = messages[index][:setting.data_bit_size_per_window]
 
         messages[index] = np.array([messages[index]])
 
@@ -39,7 +39,7 @@ def decrypt(image_path):
 
 # ganw.train(50000, dw.dataset)
 
-ganw.evaluate(dw.dataset)
+ganw.evaluate(dw.dataset, enable_hamming=True)
 
 # encrypt(
 #     "./dataset/101010.jpg",

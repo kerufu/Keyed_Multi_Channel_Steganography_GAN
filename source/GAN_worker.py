@@ -40,7 +40,7 @@ class GAN_worker():
         self.decoder_loss = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
         self.generator_metric = tf.keras.metrics.MeanSquaredError()
-        self.discriminator_metric = tf.keras.metrics.BinaryAccuracy(threshold=0) # for convenience, handle wgan score in the same way as logit, which may not be true
+        self.discriminator_metric = tf.keras.metrics.BinaryAccuracy(threshold=0) # for convenience, handle wgan score in the same way as logit, which is not precise
         self.decoders_metric = [tf.keras.metrics.BinaryAccuracy(threshold=0) for _ in range(setting.num_message_channel)]
 
     def get_generator_loss(self, input_image, output_image, messages, decoded_messages, discriminator_ouput_fake):
@@ -64,7 +64,7 @@ class GAN_worker():
     @tf.function
     def train_generator(self, batch):
         with tf.GradientTape() as generator_tape:
-            messages = [np.random.choice(2, (setting.batch_size, setting.message_size)) for _ in range(setting.num_message_channel)]
+            messages = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
             output_image = self.generator(batch, messages, training=True)
 
             decoded_messages = []
@@ -91,7 +91,7 @@ class GAN_worker():
         self.discriminator_opt.apply_gradients(zip(discriminator_gradient, self.discriminator.trainable_variables))
 
         with tf.GradientTape() as discriminator_tape_fake:
-            messages = [np.random.choice(2, (setting.batch_size, setting.message_size)) for _ in range(setting.num_message_channel)]
+            messages = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
             output_image = self.generator(batch, messages)
             discriminator_ouput_fake = self.discriminator(output_image, training=True)
 
@@ -105,7 +105,7 @@ class GAN_worker():
 
     def train_decoder(self, batch, index):
         with tf.GradientTape() as decoder_tape:
-            messages = [np.random.choice(2, (setting.batch_size, setting.message_size)) for _ in range(setting.num_message_channel)]
+            messages = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
             output_image = self.generator(batch, messages)
 
             decoded_message = self.decoders[index](output_image, training=True)
@@ -141,7 +141,7 @@ class GAN_worker():
 
             for batch in dataset:
                 image = batch[:1, :]
-                messages = [np.random.choice(2, (1, setting.message_size)) for _ in range(setting.num_message_channel)]
+                messages = [np.random.choice(2, (1, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
                 decoded_image = self.generator(image, messages)
                 decoded_messages = [self.decoders[index](decoded_image) for index in range(setting.num_message_channel)]
                 break
@@ -174,7 +174,7 @@ class GAN_worker():
             print("Sample Messages: " + str(np.array(messages[0][0])[:10]))
             print("Sample Decoded Messages: " + str(np.array(decoded_messages[0][0])[:10]))
 
-    def evaluate(self, dataset):
+    def evaluate(self, dataset, enable_hamming=False):
         dataset = dataset.take(setting.batch_size)
         dataset = dataset.shuffle(dataset.cardinality()).batch(setting.batch_size, drop_remainder=True)
 
@@ -184,10 +184,12 @@ class GAN_worker():
             self.decoders_metric[index].reset_state()
 
         for batch in dataset:
-            image = batch[:1, :]
-            messages = [np.random.choice(2, (1, setting.message_size)) for _ in range(setting.num_message_channel)]
-            decoded_image = self.generator(image, messages)
-            decoded_messages = [self.decoders[index](decoded_image) for index in range(setting.num_message_channel)]
+            if enable_hamming:
+                messages = [np.random.choice(2, (setting.batch_size, setting.data_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
+            else:
+                messages = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
+            decoded_image = self.generator(batch, messages, enable_hamming=enable_hamming)
+            decoded_messages = [self.decoders[index](decoded_image, enable_hamming=enable_hamming) for index in range(setting.num_message_channel)]
 
             discriminator_ouput_true = self.discriminator(batch)
             discriminator_ouput_fake = self.discriminator(decoded_image)
@@ -202,7 +204,7 @@ class GAN_worker():
 
             break
 
-        cv2.imwrite(setting.sample_image, np.array((image[0]+1)*127.5))
+        cv2.imwrite(setting.sample_image, np.array((batch[0]+1)*127.5))
         cv2.imwrite(setting.sample_decoded_image, np.array((decoded_image[0]+1)*127.5))
 
         print("Image Reconstruction Loss: " + str(self.generator_metric.result().numpy()))

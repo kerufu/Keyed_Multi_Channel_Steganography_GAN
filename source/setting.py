@@ -1,4 +1,4 @@
-import math
+import numpy as np
 
 image_size = 64
 
@@ -8,12 +8,26 @@ processed_dataset_path = "processed_dataset/"
 num_message_channel = 4
 
 message_bit_per_pixel = 1
-totoal_message_size = int(image_size*image_size*message_bit_per_pixel)
-message_size = totoal_message_size // num_message_channel
+total_bit_size = int(image_size*image_size*message_bit_per_pixel)
+total_bit_size_per_channel = total_bit_size // num_message_channel
+
+hamming_window_size = 8
+data_bit_size_per_window = np.log2(hamming_window_size)
+data_bit_size_per_window = int(hamming_window_size-data_bit_size_per_window-1)
+parity_bit_size_per_window = hamming_window_size - data_bit_size_per_window - 1
+num_of_window_per_channel = total_bit_size_per_channel // hamming_window_size
+residual_bits_size = total_bit_size_per_channel % hamming_window_size
+data_bit_size_per_channel = data_bit_size_per_window * num_of_window_per_channel + residual_bits_size
+
+parity_indexes = []
+for index in range(hamming_window_size-1):
+    log2_index = np.log2(index+1)
+    if log2_index == int(log2_index):
+        parity_indexes.append(index)
 
 keys = [
-    [0] * message_size,
-    [0, 1] * (message_size // 2),
+    [0] * total_bit_size_per_channel,
+    [0, 1] * (total_bit_size_per_channel // 2),
 ]
 
 GAN_pathes = {
@@ -25,7 +39,6 @@ GAN_pathes = {
 batch_size = 50
 
 dropout_ratio = 0.25
-
 
 sample_image = "sample_image.png"
 sample_decoded_image = "sample_decoded_image.png"
