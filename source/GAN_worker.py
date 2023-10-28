@@ -8,6 +8,7 @@ import cv2
 import GAN_definition
 import setting
 import layers
+import character_mapper
 
 class GAN_worker():
     def __init__(self, generator_iteration=1, discriminator_iteration=1, decoder_iteration=1, wgan=True) -> None:
@@ -174,7 +175,7 @@ class GAN_worker():
             print("Sample Messages: " + str(np.array(messages[0][0])[:10]))
             print("Sample Decoded Messages: " + str(np.array(decoded_messages[0][0])[:10]))
 
-    def evaluate(self, dataset, enable_hamming=False):
+    def evaluate(self, dataset, coding_mode=0):
         dataset = dataset.take(setting.batch_size)
         dataset = dataset.shuffle(dataset.cardinality()).batch(setting.batch_size, drop_remainder=True)
 
@@ -183,13 +184,43 @@ class GAN_worker():
         for index in range(setting.num_message_channel):
             self.decoders_metric[index].reset_state()
 
+        enable_hamming = False
+        enable_character_mapping= False
+        if coding_mode == 1:
+            enable_hamming = True
+        elif coding_mode == 2:
+            enable_character_mapping = True
+            cm = character_mapper.character_mapper()
+
         for batch in dataset:
             if enable_hamming:
                 messages = [np.random.choice(2, (setting.batch_size, setting.data_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
+            elif enable_character_mapping:
+                messages = []
+                for _ in range(setting.num_message_channel):
+                    m = np.random.choice(list(cm.mapping_table.keys()), (setting.batch_size, setting.num_of_window_per_channel))
+                    m = np.expand_dims(m, axis=2)
+                    m = np.apply_along_axis(lambda key: cm.mapping_table[int(key)], axis=2, arr=m)
+                    m = tf.concat(m, axis=-1)
+                    m = np.array(m)
+                    m = m.reshape((-1, setting.total_bit_size_per_channel))
+                    messages.append(m)
             else:
                 messages = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
+
             decoded_image = self.generator(batch, messages, enable_hamming=enable_hamming)
             decoded_messages = [self.decoders[index](decoded_image, enable_hamming=enable_hamming) for index in range(setting.num_message_channel)]
+            
+            if enable_character_mapping:
+                for index in range(setting.num_message_channel):
+                    decoded_messages[index] = tf.math.sigmoid(decoded_messages[index])
+                    decoded_messages[index] = tf.math.round(decoded_messages[index])
+                    decoded_messages[index] = np.array(decoded_messages[index])
+                    decoded_messages[index] = decoded_messages[index].reshape((-1, setting.num_of_window_per_channel, setting.coding_window_size))
+                    decoded_messages[index] = np.apply_along_axis(cm.matching, axis=2, arr=decoded_messages[index])
+                    decoded_messages[index] = decoded_messages[index].astype(np.float32)
+                    decoded_messages[index] = decoded_messages[index].reshape((-1, setting.total_bit_size_per_channel))
+                    decoded_messages[index] = decoded_messages[index] * 2 - 1
 
             discriminator_ouput_true = self.discriminator(batch)
             discriminator_ouput_fake = self.discriminator(decoded_image)

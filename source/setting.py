@@ -11,19 +11,23 @@ message_bit_per_pixel = 1
 total_bit_size = int(image_size*image_size*message_bit_per_pixel)
 total_bit_size_per_channel = total_bit_size // num_message_channel
 
-hamming_window_size = 8
-data_bit_size_per_window = np.log2(hamming_window_size)
-data_bit_size_per_window = int(hamming_window_size-data_bit_size_per_window-1)
-parity_bit_size_per_window = hamming_window_size - data_bit_size_per_window - 1
-num_of_window_per_channel = total_bit_size_per_channel // hamming_window_size
-residual_bits_size = total_bit_size_per_channel % hamming_window_size
-data_bit_size_per_channel = data_bit_size_per_window * num_of_window_per_channel + residual_bits_size
+coding_window_size = 8
 
+data_bit_size_per_window = np.log2(coding_window_size)
+data_bit_size_per_window = int(coding_window_size-data_bit_size_per_window-1)
+parity_bit_size_per_window = coding_window_size - data_bit_size_per_window - 1
+num_of_window_per_channel = total_bit_size_per_channel // coding_window_size
+residual_bits_size = total_bit_size_per_channel % coding_window_size
+data_bit_size_per_channel = data_bit_size_per_window * num_of_window_per_channel + residual_bits_size
 parity_indexes = []
-for index in range(hamming_window_size-1):
+for index in range(coding_window_size-1):
     log2_index = np.log2(index+1)
     if log2_index == int(log2_index):
         parity_indexes.append(index)
+
+size_of_dictionary = 16 # if setting to 36, can code a-z, 0-9. if setting to 16, then the utilization rate is the same as (8, 4) hamming code
+code_space_size = 2 ** coding_window_size
+mapping_table_path = "character_mapping_table.pickle"
 
 keys = [
     [0] * total_bit_size_per_channel,

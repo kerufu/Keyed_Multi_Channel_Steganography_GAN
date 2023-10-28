@@ -12,7 +12,7 @@ class HammingCode(tf.keras.layers.Layer):
         bit_stream = []
         data_index = 0
         parity_ints = np.array([0]*setting.batch_size)
-        for index in range(setting.hamming_window_size-1):
+        for index in range(setting.coding_window_size-1):
             if index in setting.parity_indexes:
                 bit_stream.append(np.array([-1]*setting.batch_size))
             else:
@@ -44,7 +44,7 @@ class HammingCode(tf.keras.layers.Layer):
 
         parity_bits = []
         data_bits = []
-        for index in range(setting.hamming_window_size-1):
+        for index in range(setting.coding_window_size-1):
             if index in setting.parity_indexes:
                 parity_bits.append(bit_stream[:, index])
             else:
@@ -59,7 +59,6 @@ class HammingCode(tf.keras.layers.Layer):
         computed_bit_stream, computed_parity_bits = self.encode(data_bits)
         possibly_single_error = np.where(window_parity!=computed_bit_stream[:, 0], True, False)
 
-            
         distance = [0] * setting.batch_size
         distance = np.array(distance)
         temp_distance = [0] * setting.batch_size
@@ -90,7 +89,7 @@ class HammingCode(tf.keras.layers.Layer):
             data_bits = []
 
             for index in range(setting.num_of_window_per_channel):
-                bs = bit_stream[:, setting.hamming_window_size*index:setting.hamming_window_size*(index+1)]
+                bs = bit_stream[:, setting.coding_window_size*index:setting.coding_window_size*(index+1)]
                 db, rpb, wp = self.decode(bs)
                 db = self.correction(db, rpb, wp)
                 data_bits.append(db)

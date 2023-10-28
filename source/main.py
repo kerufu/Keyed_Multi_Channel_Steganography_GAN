@@ -39,7 +39,7 @@ def decrypt(image_path):
 
 # ganw.train(50000, dw.dataset)
 
-ganw.evaluate(dw.dataset, enable_hamming=True)
+ganw.evaluate(dw.dataset, coding_mode=0)
 
 # encrypt(
 #     "./dataset/101010.jpg",
