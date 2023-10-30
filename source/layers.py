@@ -41,21 +41,15 @@ class HammingCode(tf.keras.layers.Layer):
     def decode(self, bit_stream):
         window_parity = bit_stream[:, 0]
         bit_stream = bit_stream[:, 1:]
-
-        parity_bits = []
+        recieved_parity_bits = []
         data_bits = []
         for index in range(setting.coding_window_size-1):
             if index in setting.parity_indexes:
-                parity_bits.append(bit_stream[:, index])
+                recieved_parity_bits.append(bit_stream[:, index])
             else:
                 data_bits.append(bit_stream[:, index])
-
         data_bits = np.array(data_bits).T
-        parity_bits = np.array(parity_bits).T
-
-        return data_bits, parity_bits, window_parity
-    
-    def correction(self, data_bits, recieved_parity_bits, window_parity):
+        recieved_parity_bits = np.array(recieved_parity_bits).T
         computed_bit_stream, computed_parity_bits = self.encode(data_bits)
         possibly_single_error = np.where(window_parity!=computed_bit_stream[:, 0], True, False)
 
@@ -85,29 +79,26 @@ class HammingCode(tf.keras.layers.Layer):
         return data_bits
 
     def call(self, bit_stream):
-        if self.decode_mode:
-            data_bits = []
+        result = []
 
+        if self.decode_mode:
             for index in range(setting.num_of_window_per_channel):
                 bs = bit_stream[:, setting.coding_window_size*index:setting.coding_window_size*(index+1)]
-                db, rpb, wp = self.decode(bs)
-                db = self.correction(db, rpb, wp)
-                data_bits.append(db)
+                db = self.decode(bs)
+                result.append(db)
             if setting.residual_bits_size:
-                data_bits.append(bit_stream[:, -setting.residual_bits_size:])
-            data_bits = tf.concat(data_bits, axis=1)
-            return data_bits
+                result.append(bit_stream[:, -setting.residual_bits_size:])
         else:
-            encoded_bit_stream = []
             for index in range(setting.num_of_window_per_channel):
                 bs = bit_stream[:, setting.data_bit_size_per_window*index:setting.data_bit_size_per_window*(index+1)]
                 ebs, pb = self.encode(bs)
-                encoded_bit_stream.append(ebs)
+                result.append(ebs)
             if setting.residual_bits_size:
-                encoded_bit_stream.append(bit_stream[:, -setting.residual_bits_size:])
-            encoded_bit_stream = tf.concat(encoded_bit_stream, axis=1)
-            encoded_bit_stream = np.array(encoded_bit_stream).astype(int)
-            return encoded_bit_stream
+                result.append(bit_stream[:, -setting.residual_bits_size:])
+        
+        result = tf.concat(result, axis=1)
+        result = np.array(result).astype(int)
+        return result
 
 class WassersteinLoss(tf.keras.losses.Loss):
     def call(self, y_true, y_pred):

@@ -92,6 +92,6 @@ class decoder(tf.keras.Model):
             x = tf.math.sigmoid(x)
             x = tf.math.round(x)
             x = self.hamming_layer(x)
-            x = x * 2 - 1
+            x = x - 0.5
         
         return x

@@ -41,7 +41,7 @@ class GAN_worker():
         self.decoder_loss = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
         self.generator_metric = tf.keras.metrics.MeanSquaredError()
-        self.discriminator_metric = tf.keras.metrics.BinaryAccuracy(threshold=0) # for convenience, handle wgan score in the same way as logit, which is not precise
+        self.discriminator_metric = tf.keras.metrics.BinaryAccuracy(threshold=0) # for convenience, handle wgan score in the same way as logit, which is not actual
         self.decoders_metric = [tf.keras.metrics.BinaryAccuracy(threshold=0) for _ in range(setting.num_message_channel)]
 
     def get_generator_loss(self, input_image, output_image, messages, decoded_messages, discriminator_ouput_fake):
@@ -220,7 +220,7 @@ class GAN_worker():
                     decoded_messages[index] = np.apply_along_axis(cm.matching, axis=2, arr=decoded_messages[index])
                     decoded_messages[index] = decoded_messages[index].astype(np.float32)
                     decoded_messages[index] = decoded_messages[index].reshape((-1, setting.total_bit_size_per_channel))
-                    decoded_messages[index] = decoded_messages[index] * 2 - 1
+                    decoded_messages[index] = decoded_messages[index] - 0.5
 
             discriminator_ouput_true = self.discriminator(batch)
             discriminator_ouput_fake = self.discriminator(decoded_image)
@@ -232,6 +232,18 @@ class GAN_worker():
 
             for index in range(setting.num_message_channel):
                 self.decoders_metric[index].update_state(messages[index], decoded_messages[index])
+
+            #     count = 0
+            #     if coding_mode == 0:
+            #         decoded_messages[index] = tf.math.sigmoid(decoded_messages[index])
+            #         decoded_messages[index] = tf.math.round(decoded_messages[index])
+            #         diff = (messages[index] - decoded_messages[index])[0]
+            #     else:
+            #         diff = (messages[index] - decoded_messages[index] - 0.5)[0]
+            #     diff = np.where(diff!=0)
+            #     count += len(diff)
+            #     print(diff)
+            # print(count)
 
             break
 

@@ -25,7 +25,7 @@ for index in range(coding_window_size-1):
     if log2_index == int(log2_index):
         parity_indexes.append(index)
 
-size_of_dictionary = 16 # if setting to 36, can code a-z, 0-9. if setting to 16, then the utilization rate is the same as (8, 4) hamming code
+size_of_dictionary = 16  # if setting to 36, it can code a-z, 0-9. if setting to 16, then the utilization rate is the same as (8, 4) hamming code
 code_space_size = 2 ** coding_window_size
 mapping_table_path = "character_mapping_table.pickle"
 
