@@ -217,7 +217,7 @@ class GAN_worker():
                     decoded_messages[index] = tf.math.round(decoded_messages[index])
                     decoded_messages[index] = np.array(decoded_messages[index])
                     decoded_messages[index] = decoded_messages[index].reshape((-1, setting.num_of_window_per_channel, setting.coding_window_size))
-                    decoded_messages[index] = np.apply_along_axis(cm.matching, axis=2, arr=decoded_messages[index])
+                    decoded_messages[index] = np.apply_along_axis(cm.bits_matching, axis=2, arr=decoded_messages[index])
                     decoded_messages[index] = decoded_messages[index].astype(np.float32)
                     decoded_messages[index] = decoded_messages[index].reshape((-1, setting.total_bit_size_per_channel))
                     decoded_messages[index] = decoded_messages[index] - 0.5
@@ -232,18 +232,6 @@ class GAN_worker():
 
             for index in range(setting.num_message_channel):
                 self.decoders_metric[index].update_state(messages[index], decoded_messages[index])
-
-            #     count = 0
-            #     if coding_mode == 0:
-            #         decoded_messages[index] = tf.math.sigmoid(decoded_messages[index])
-            #         decoded_messages[index] = tf.math.round(decoded_messages[index])
-            #         diff = (messages[index] - decoded_messages[index])[0]
-            #     else:
-            #         diff = (messages[index] - decoded_messages[index] - 0.5)[0]
-            #     diff = np.where(diff!=0)
-            #     count += len(diff)
-            #     print(diff)
-            # print(count)
 
             break
 

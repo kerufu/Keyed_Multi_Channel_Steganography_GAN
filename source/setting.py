@@ -29,6 +29,10 @@ size_of_dictionary = 16  # if setting to 36, it can code a-z, 0-9. if setting to
 code_space_size = 2 ** coding_window_size
 mapping_table_path = "character_mapping_table.pickle"
 
+command_set_path = "command_set.pickle"
+vulnerable_command = [247, 8, 62]
+command_set_seed = 7
+
 keys = [
     [0] * total_bit_size_per_channel,
     [0, 1] * (total_bit_size_per_channel // 2),

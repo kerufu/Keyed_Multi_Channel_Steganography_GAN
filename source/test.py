@@ -3,7 +3,7 @@ import layers
 import numpy as np
 import setting
 import character_mapper
-import tensorflow as tf
+import math
 
 
 acc = 0.965
@@ -39,10 +39,33 @@ def character_mapper_evaluate():
         for bit_index in range(setting.coding_window_size):
             if np.random.uniform() > acc:
                 word = np.bitwise_xor(word, 2**bit_index)
-        mapped_word = cm.matching(cm.int_to_bits(word))
+        mapped_word = cm.bits_matching(cm.int_to_bits(word))
         mapped_word = cm.bits_to_int(mapped_word)
         dis = cm.hamming_distance(word_original, mapped_word)
         dis_sum += dis
     print("final acc", 1-(dis_sum/evaluate_size/setting.coding_window_size))
 
-character_mapper_evaluate()
+def botnet_metrics(num_redundacy):
+    def prob(total, num, p):
+        choice = math.comb(total, num)
+        return choice * (p ** (num)) * ((1-p) ** (total-num))
+    
+    byte_acc = acc ** 8
+    byte_err_rate = (1 - byte_acc) / 255
+    result = 0
+
+    for i in range(num_redundacy//2):
+        result += prob(num_redundacy, num_redundacy-i, byte_acc)
+
+    for i in range(num_redundacy//2, num_redundacy+1):
+        prob_corr = prob(num_redundacy, num_redundacy-i, byte_acc)
+        for j in range(num_redundacy-i):
+            prob_err = prob(i, j, byte_err_rate)
+            result += prob_corr * prob_err
+        prob_err = prob(i, num_redundacy-i, byte_err_rate)
+        result += prob_corr * prob_err / 2
+
+    print("num bot: ", setting.total_bit_size//8//num_redundacy)
+    print("acc: ", result)
+
+botnet_metrics(128)

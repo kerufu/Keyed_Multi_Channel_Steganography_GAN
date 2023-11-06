@@ -6,13 +6,12 @@ import setting
 class character_mapper():
     def __init__(self) -> None:
 
-        self.compute_mapping_table()
-        # try:
-        #     with open(setting.mapping_table_path, 'rb') as fp:
-        #         self.mapping_table = pickle.load(fp)
-        # except Exception as e:
-        #     print(e)
-        #     self.compute_mapping_table()
+        try:
+            with open(setting.mapping_table_path, 'rb') as fp:
+                self.mapping_table = pickle.load(fp)
+        except Exception as e:
+            print(e)
+            self.compute_mapping_table()
 
     def hamming_distance(self, n1, n2):
         return bin(np.bitwise_xor(np.uint64(n1), np.uint64(n2))).count("1")
@@ -24,7 +23,7 @@ class character_mapper():
         return np.mean(distance), np.std(distance)
     
     def selective_generation(self):
-        self.mapping_table = [0]
+        self.mapping_table = [setting.command_set_seed]
         while len(self.mapping_table) < setting.size_of_dictionary:
             max_mean = -np.inf
             min_std = np.inf
@@ -71,13 +70,12 @@ class character_mapper():
             mapping_table[self.mapping_table[code_index]] = bits
         self.mapping_table = mapping_table
         
-        # with open(setting.mapping_table_path, 'wb') as fp:
-        #     pickle.dump(self.mapping_table, fp, protocol=pickle.HIGHEST_PROTOCOL)
+        with open(setting.mapping_table_path, 'wb') as fp:
+            pickle.dump(self.mapping_table, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
     def bits_to_int(self, bits):
         bits_int = 0
         for i, j in enumerate(bits[::-1]):
-            # bits_int += j<<i
             bits_int += np.left_shift(np.uint64(j), np.uint64(i))
         return bits_int
     
@@ -86,7 +84,7 @@ class character_mapper():
         bits = np.fromstring(bits,'u1') - ord('0')
         return bits
 
-    def matching(self, bits):
+    def bits_matching(self, bits):
         bits_int = self.bits_to_int(bits)
         min_dis = np.inf
         min_code = 0
@@ -96,3 +94,13 @@ class character_mapper():
                 min_dis = dis
                 min_code = code_int
         return self.mapping_table[min_code]
+    
+    def int_matching(self, ints):
+        min_dis = np.inf
+        min_code = 0
+        for code_int in self.mapping_table.keys():
+            dis = self.hamming_distance(code_int, ints)
+            if dis < min_dis:
+                min_dis = dis
+                min_code = code_int
+        return self.bits_to_int(self.mapping_table[min_code])
