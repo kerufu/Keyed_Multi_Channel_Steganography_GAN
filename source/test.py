@@ -4,7 +4,7 @@ import numpy as np
 import setting
 import character_mapper
 import math
-
+import cv2
 
 acc = 0.965
 
@@ -67,5 +67,12 @@ def botnet_metrics(num_redundacy):
 
     print("num bot: ", setting.total_bit_size//8//num_redundacy)
     print("acc: ", result)
+
+import sys
+import numpy
+numpy.set_printoptions(threshold=sys.maxsize)
+i = cv2.imread("../sample_encoded_image.png", cv2.IMREAD_UNCHANGED)
+print(i.shape)
+print(i[:,:,3])
 
 botnet_metrics(128)

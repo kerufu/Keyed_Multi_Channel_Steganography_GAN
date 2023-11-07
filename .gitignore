@@ -2,5 +2,5 @@ dataset
 processed_dataset
 saved_model
 
-sample_decoded_image.png
-sample_image.png
+*.png
+*.pickle

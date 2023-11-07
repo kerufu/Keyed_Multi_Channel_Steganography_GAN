@@ -30,7 +30,15 @@ code_space_size = 2 ** coding_window_size
 mapping_table_path = "character_mapping_table.pickle"
 
 command_set_path = "command_set.pickle"
-vulnerable_command = [247, 8, 62]
+vulnerable_command = {
+    True: [247, 8, 62],
+    False: [
+        0, 1, 128, 2, 4, 3, 6, 129, 8, 12, 16, 24,
+        159, 32, 175, 48, 191, 64, 63, 192, 207, 223,
+        231, 239, 243, 252, 247, 249, 126, 251, 127,
+        253, 254, 255, 96, 235, 95, 199, 245, 250, 62, 56, 227
+        ]
+    }
 command_set_seed = 7
 
 keys = [
@@ -49,7 +57,7 @@ batch_size = 50
 dropout_ratio = 0.25
 
 sample_image = "sample_image.png"
-sample_decoded_image = "sample_decoded_image.png"
+sample_encoded_image = "sample_encoded_image.png"
 
 label_smoothing_ratio = 0.1
 

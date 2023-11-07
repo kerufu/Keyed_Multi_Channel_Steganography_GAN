@@ -148,7 +148,7 @@ class GAN_worker():
                 break
 
             cv2.imwrite(setting.sample_image, np.array((image[0]+1)*127.5))
-            cv2.imwrite(setting.sample_decoded_image, np.array((decoded_image[0]+1)*127.5))
+            cv2.imwrite(setting.sample_encoded_image, np.array((decoded_image[0]+1)*127.5))
             
             cprint('Time for epoch {} is {} sec'.format(epoch_num + 1, time.time()-start), 'red')
 
@@ -236,7 +236,7 @@ class GAN_worker():
             break
 
         cv2.imwrite(setting.sample_image, np.array((batch[0]+1)*127.5))
-        cv2.imwrite(setting.sample_decoded_image, np.array((decoded_image[0]+1)*127.5))
+        cv2.imwrite(setting.sample_encoded_image, np.array((decoded_image[0]+1)*127.5))
 
         print("Image Reconstruction Loss: " + str(self.generator_metric.result().numpy()))
         print("Discriminator Accuracy: " + str(self.discriminator_metric.result().numpy()))
