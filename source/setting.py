@@ -1,4 +1,5 @@
 import numpy as np
+import tweepy
 
 image_size = 64
 
@@ -58,6 +59,7 @@ dropout_ratio = 0.25
 
 sample_image = "sample_image.png"
 sample_encoded_image = "sample_encoded_image.png"
+sample_downloaded_image = "sample_downloaded_image.png"
 
 label_smoothing_ratio = 0.1
 
@@ -72,3 +74,18 @@ kernal_clip_value = 0.1
 
 shuffle_buffer_size_divider = 1
 
+twitter_credential = {
+    "bearer_key": "AAAAAAAAAAAAAAAAAAAAALSkqwEAAAAAtcGFLrvjqT1QNhkGaSZwXS9MO3Q%3D0pwtNVGaDcPhwUp5SPHCjfQPRNM9xF3aVui4xacmBYTh47fUmd",
+    "api_key": "yL93Uta37IBi4qHx4d9pXjIPy",
+    "api_secret": "s5UFZmc1bmu9VqguuyaEGJIiVVLNtxKRtsifoxesCgs4YUqEJf",
+    "access_token": "1721801499179974656-JQYwYlJoiX1B9z8l7NTRhwf5WnfbkA",
+    "access_token_secret": "OQwATyMrf3i9vyEsathR3CIMFEVhzx6YF5jQMEdF1oneA"
+}
+
+# twitter_api = tweepy.API(tweepy.OAuth2BearerHandler(twitter_credential["bearer_key"]))
+twitter_api = tweepy.API(tweepy.OAuth1UserHandler(
+   twitter_credential["api_key"], twitter_credential["api_secret"],
+   twitter_credential["access_token"], twitter_credential["access_token_secret"]
+))
+master = twitter_api.get_user(screen_name="j935447281765")
+steg_image_url = master.profile_image_url_https.replace("normal", "400x400")
