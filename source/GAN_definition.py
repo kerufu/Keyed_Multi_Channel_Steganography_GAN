@@ -11,7 +11,7 @@ class generator(tf.keras.Model):
         self.input_module = [
             layers.CustomConv2d(32, 3, reflect_padding=True),
         ]
-        self.xor_layer = layers.XORMessage(key)
+        self.xor_layer = layers.XORMessages(key)
         self.concat_layer = layers.ImageMessageConcatenation(setting.image_size)
         self.output_module = [
             layers.CustomConv2d(32, 3, reflect_padding=True),

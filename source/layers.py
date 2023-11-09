@@ -112,9 +112,9 @@ class ClipConstraint(tf.keras.constraints.Constraint):
     def get_config(self):
         return {'kernal_clip_value': setting.kernal_clip_value}
 
-class XORMessage(tf.keras.layers.Layer):
+class XORMessages(tf.keras.layers.Layer):
     def __init__(self, xor_key):
-        super(XORMessage, self).__init__()
+        super(XORMessages, self).__init__()
         self.xor_key = xor_key
 
     def call(self, messages):
@@ -175,45 +175,45 @@ class CustomConv2d(tf.keras.layers.Layer):
 
         if reflect_padding:
             if scale_down_mode == 0:
-                self.module = [
+                self.model = [
                     ReflectRadding(kernel_size),
                     tf.keras.layers.Conv2D(num_channel, kernel_size, kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
                 ]
             elif scale_down_mode == 1:
-                self.module = [
+                self.model = [
                     ReflectRadding(kernel_size),
                     tf.keras.layers.Conv2D(num_channel, kernel_size, strides=2, kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
                 ]
             elif scale_down_mode == 2:
-                self.module = [
+                self.model = [
                     ReflectRadding(kernel_size),
                     tf.keras.layers.Conv2D(num_channel, kernel_size, kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
                     tf.keras.layers.MaxPool2D(),
                 ]
         else:
             if scale_down_mode == 0:
-                self.module = [
+                self.model = [
                     tf.keras.layers.Conv2D(num_channel, kernel_size, padding='same', kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
                 ]
             elif scale_down_mode == 1:
-                self.module = [
+                self.model = [
                     tf.keras.layers.Conv2D(num_channel, kernel_size, strides=2, padding='same', kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
                 ]
             elif scale_down_mode == 2:
-                self.module = [
+                self.model = [
                     tf.keras.layers.Conv2D(num_channel, kernel_size, padding='same', kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
                     tf.keras.layers.MaxPool2D(),
                 ]
 
-        self.module += [
+        self.model += [
             tf.keras.layers.Activation(activation),
             tf.keras.layers.BatchNormalization()
         ]
         if dropout:
-            self.module.append(tf.keras.layers.Dropout(setting.dropout_ratio))
+            self.model.append(tf.keras.layers.Dropout(setting.dropout_ratio))
 
     def call(self, x, training):
-        for layer in self.module:
+        for layer in self.model:
             if "dropout" in layer.name or "batch_normalization" in layer.name:
                 x = layer(x, training)
             else:
@@ -229,16 +229,16 @@ class CustomDense(tf.keras.layers.Layer):
         if clip_kernal:
             kernel_constraint = ClipConstraint()
 
-        self.module = [
+        self.model = [
             tf.keras.layers.Dense(output_size, kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
             tf.keras.layers.Activation(activation),
             tf.keras.layers.BatchNormalization()
         ]
         if dropout:
-            self.module.append(tf.keras.layers.Dropout(setting.dropout_ratio))
+            self.model.append(tf.keras.layers.Dropout(setting.dropout_ratio))
 
     def call(self, x, training):
-        for layer in self.module:
+        for layer in self.model:
             if "dropout" in layer.name or "batch_normalization" in layer.name:
                 x = layer(x, training)
             else:

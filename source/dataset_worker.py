@@ -21,7 +21,6 @@ class dataset_worker():
             data.append(img)
 
         data = np.array(data)
-        data = data / 127.5 - 1
         
         dataset = tf.data.Dataset.from_tensor_slices(data)
 
@@ -40,4 +39,5 @@ class dataset_worker():
             img = cv2.copyMakeBorder(img, 0, 0, padding_size, padding_size, cv2.BORDER_REFLECT)
 
         img = cv2.resize(img, (setting.image_size, setting.image_size))
+        data = data / 127.5 - 1
         return img

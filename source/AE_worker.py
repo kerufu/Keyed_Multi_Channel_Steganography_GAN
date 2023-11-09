@@ -5,16 +5,15 @@ import numpy as np
 from termcolor import cprint
 import cv2
 
+import worker_factory
 import AE_definition
 import setting
-import GAN_worker
 
 class AE_worker():
     def __init__(self, key):
         self.encoder = AE_definition.encoder()
         self.decoder = AE_definition.decoder(key)
-        self.generator = GAN_worker.GAN_worker(setting.GAN_key)
-        self.generator = self.generator.generator
+        self.generator = worker_factory.ganw.generator
 
         try:
             self.encoder.load_weights(setting.AE_pathes["encoder"])
@@ -102,4 +101,5 @@ class AE_worker():
             print("Randomness Loss: " + str(self.randomness_metric.result().numpy()))
 
     def encode(self, image):
-        return self.encode([image])[0]
+        image = np.array([worker_factory.dw.preprocess_image(image)])
+        return self.encoder(image)[0]
