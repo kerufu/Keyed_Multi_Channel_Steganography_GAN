@@ -1,5 +1,4 @@
 import tensorflow as tf
-import numpy
 
 import setting
 import layers
@@ -12,7 +11,7 @@ class generator(tf.keras.Model):
         self.input_module = [
             layers.CustomConv2d(32, 3, reflect_padding=True),
         ]
-        self.xor_layer = layers.XORMessages(key)
+        self.xor_layer = layers.XORMessage(key)
         self.concat_layer = layers.ImageMessageConcatenation(setting.image_size)
         self.output_module = [
             layers.CustomConv2d(32, 3, reflect_padding=True),
@@ -40,7 +39,7 @@ class generator(tf.keras.Model):
         if self.sum_residual:
             return tf.clip_by_value(image+middle_features[-1], clip_value_min=-1, clip_value_max=1)
         else:
-            return image + middle_features[-1] / 2
+            return (image + middle_features[-1]) / 2
 
 class discriminator(tf.keras.Model):
     def __init__(self):

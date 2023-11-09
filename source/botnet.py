@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 import tensorflow as tf
 import wget
+import tweepy
 
 import dataset_worker
 import GAN_worker
@@ -12,8 +13,15 @@ import setting
 import character_mapper
 
 dw = dataset_worker.dataset_worker()
-ganw = GAN_worker.GAN_worker()
+ganw = GAN_worker.GAN_worker(setting.GAN_key)
 cm = character_mapper.character_mapper()
+
+twitter_api = tweepy.API(tweepy.OAuth1UserHandler(
+   setting.twitter_credential["api_key"], setting.twitter_credential["api_secret"],
+   setting.twitter_credential["access_token"], setting.twitter_credential["access_token_secret"]
+))
+master = twitter_api.get_user(screen_name="j935447281765")
+steg_image_url = master.profile_image_url_https.replace("normal", "400x400")
 
 def botmaster_process(image_path, commands):
     img = np.array([dw.preprocess_image(image_path)])
@@ -88,7 +96,7 @@ def generate_twitter_profile_image(character_mapping=False):
 
     botmaster_process(setting.sample_image, commands)
 
-    setting.twitter_api.update_profile_image(filename=setting.sample_encoded_image)
+    twitter_api.update_profile_image(filename=setting.sample_encoded_image)
 
 def decode_twitter_profile_image(character_mapping=False):
 

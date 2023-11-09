@@ -11,12 +11,12 @@ import layers
 import character_mapper
 
 class GAN_worker():
-    def __init__(self, generator_iteration=1, discriminator_iteration=1, decoder_iteration=1, wgan=True) -> None:
+    def __init__(self, key, generator_iteration=1, discriminator_iteration=1, decoder_iteration=1, wgan=True) -> None:
         self.generator_iteration = generator_iteration
         self.discriminator_iteration = discriminator_iteration
         self.decoder_iteration = decoder_iteration
 
-        self.generator = GAN_definition.generator(setting.keys[0])
+        self.generator = GAN_definition.generator(key)
         self.discriminator = GAN_definition.discriminator()
         self.decoders = [GAN_definition.decoder() for _ in range(setting.num_message_channel)]
 
@@ -140,12 +140,10 @@ class GAN_worker():
                     for index in range(setting.num_message_channel):
                         self.train_decoder(batch, index)
 
-            for batch in dataset:
-                image = batch[:1, :]
-                messages = [np.random.choice(2, (1, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
-                decoded_image = self.generator(image, messages)
-                decoded_messages = [self.decoders[index](decoded_image) for index in range(setting.num_message_channel)]
-                break
+            image = batch[:1, :]
+            messages = [np.random.choice(2, (1, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
+            decoded_image = self.generator(image, messages)
+            decoded_messages = [self.decoders[index](decoded_image) for index in range(setting.num_message_channel)]
 
             cv2.imwrite(setting.sample_image, np.array((image[0]+1)*127.5))
             cv2.imwrite(setting.sample_encoded_image, np.array((decoded_image[0]+1)*127.5))

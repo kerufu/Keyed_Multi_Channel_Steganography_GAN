@@ -1,5 +1,4 @@
 import numpy as np
-import tweepy
 
 image_size = 64
 
@@ -42,15 +41,15 @@ vulnerable_command = {
     }
 command_set_seed = 7
 
-keys = [
-    [0] * total_bit_size_per_channel,
-    [0, 1] * (total_bit_size_per_channel // 2),
-]
-
 GAN_pathes = {
     "generator": "saved_model/GAN/generator",
     "discriminator": "saved_model/GAN/discriminator",
     "decoder": "saved_model/GAN/decoder",
+}
+
+AE_pathes = {
+    "encoder": "saved_model/AE/encoder",
+    "decoder": "saved_model/AE/decoder",
 }
 
 batch_size = 50
@@ -60,6 +59,7 @@ dropout_ratio = 0.25
 sample_image = "sample_image.png"
 sample_encoded_image = "sample_encoded_image.png"
 sample_downloaded_image = "sample_downloaded_image.png"
+sample_reconstructed_image = "sample_reconstructed_image.png"
 
 label_smoothing_ratio = 0.1
 
@@ -74,18 +74,19 @@ kernal_clip_value = 0.1
 
 shuffle_buffer_size_divider = 1
 
+np.random.seed(0)
+
+GAN_key = [0] * total_bit_size_per_channel
+# GAN_key = np.random.choice(2, size=total_bit_size_per_channel)
+
+AE_feature_size = 128
+AE_key = np.random.choice(2, size=(image_size, image_size, AE_feature_size))
+
 twitter_credential = {
-    "bearer_key": "AAAAAAAAAAAAAAAAAAAAALSkqwEAAAAAtcGFLrvjqT1QNhkGaSZwXS9MO3Q%3D0pwtNVGaDcPhwUp5SPHCjfQPRNM9xF3aVui4xacmBYTh47fUmd",
-    "api_key": "yL93Uta37IBi4qHx4d9pXjIPy",
-    "api_secret": "s5UFZmc1bmu9VqguuyaEGJIiVVLNtxKRtsifoxesCgs4YUqEJf",
-    "access_token": "1721801499179974656-JQYwYlJoiX1B9z8l7NTRhwf5WnfbkA",
-    "access_token_secret": "OQwATyMrf3i9vyEsathR3CIMFEVhzx6YF5jQMEdF1oneA"
+    "bearer_key": "AAAAAAAAAAAAAAAAAAAAALSkqwEAAAAALv5wu%2BTFlhkGnHJxyWQvJo3Opcc%3DiFJ85iK6k2MM02Ien9prOfgBdo6rdov8kgzgh6NBjuQZN9jRKK",
+    "api_key": "tMEQCcXEmTySJkLILF5IycchS",
+    "api_secret": "xO0bHt6YfpAfvH8ETrBNbQMBWdyEQrEA5wp9xokc34pynxroCg",
+    "access_token": "1721801499179974656-YAVkRZCeH2wDR6uTeAzOJXpWoZ9wjt",
+    "access_token_secret": "ttOPqSxHazyoYWSHWXdnyrLl6siQpcntgstEWbYSk1cZ1"
 }
 
-# twitter_api = tweepy.API(tweepy.OAuth2BearerHandler(twitter_credential["bearer_key"]))
-twitter_api = tweepy.API(tweepy.OAuth1UserHandler(
-   twitter_credential["api_key"], twitter_credential["api_secret"],
-   twitter_credential["access_token"], twitter_credential["access_token_secret"]
-))
-master = twitter_api.get_user(screen_name="j935447281765")
-steg_image_url = master.profile_image_url_https.replace("normal", "400x400")
