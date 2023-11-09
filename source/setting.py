@@ -81,6 +81,7 @@ GAN_key = [0] * total_bit_size_per_channel
 
 AE_feature_size = 128
 AE_key = np.random.choice(2, size=(image_size, image_size, AE_feature_size))
+AE_feature_distance_threshold = 0.00296296955
 
 twitter_credential = {
     "bearer_key": "AAAAAAAAAAAAAAAAAAAAALSkqwEAAAAALv5wu%2BTFlhkGnHJxyWQvJo3Opcc%3DiFJ85iK6k2MM02Ien9prOfgBdo6rdov8kgzgh6NBjuQZN9jRKK",

@@ -65,10 +65,7 @@ class AE_worker():
         self.reconstruction_metric.update_state(batch, output_image)
         self.randomness_metric.update_state(target_feature, feature)
 
-    def train(self, epoch, dataset):
-        dataset = dataset.take(setting.batch_size)
-        dataset = dataset.shuffle(dataset.cardinality()//setting.shuffle_buffer_size_divider, reshuffle_each_iteration=True).batch(setting.batch_size, drop_remainder=True)
-
+    def train(self, epoch):
         recons_loss_min = np.inf
 
         for epoch_num in range(epoch):
@@ -76,7 +73,7 @@ class AE_worker():
             self.reconstruction_metric.reset_state()
             self.randomness_metric.reset_state()
             
-            for batch in dataset:
+            for batch in worker_factory.dw.dataset:
                 self.train_step(batch)
 
             image = batch[:1, :]
@@ -103,3 +100,27 @@ class AE_worker():
     def encode(self, image):
         image = np.array([worker_factory.dw.preprocess_image(image)])
         return self.encoder(image)[0]
+    
+    def evaluate(self, evaluation_step=100):
+        distance_match = []
+        distance_mismatch = []
+        for _ in range(evaluation_step):
+            for batch in worker_factory.dw.dataset:
+                messages_1 = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
+                messages_2 = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
+                input_image_1 = self.generator(batch, messages_1)
+                input_image_2 = self.generator(batch, messages_2)
+                feature_1 = self.encoder(input_image_1)
+                feature_2 = self.encoder(input_image_2)
+
+                distance_match.append(np.mean(np.abs(feature_1-feature_2)))
+
+                batch = np.roll(batch, np.random.randint(1, setting.batch_size-1))
+                messages_3 = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
+                input_image_3 = self.generator(batch, messages_3)
+                feature_3 = self.encoder(input_image_3)
+
+                distance_mismatch.append(np.mean(np.abs(feature_1-feature_3)))
+        print("max distance_match", max(distance_match))
+        print("min distance mismatch", min(distance_mismatch))
+

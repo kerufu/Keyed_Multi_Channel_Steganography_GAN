@@ -124,10 +124,7 @@ class GAN_worker():
 
         self.decoders_metric[index].update_state(messages[index], decoded_message)
 
-    def train(self, epoch, dataset):
-        dataset = dataset.take(setting.batch_size)
-        dataset = dataset.shuffle(dataset.cardinality()//setting.shuffle_buffer_size_divider, reshuffle_each_iteration=True).batch(setting.batch_size, drop_remainder=True)
-
+    def train(self, epoch):
         acc_max = 0
 
         for epoch_num in range(epoch):
@@ -137,7 +134,7 @@ class GAN_worker():
             for index in range(setting.num_message_channel):
                 self.decoders_metric[index].reset_state()
             
-            for batch in dataset:
+            for batch in worker_factory.dw.dataset:
                 for _ in range(self.discriminator_iteration):
                     self.train_discriminator(batch)
                 for _ in range(self.generator_iteration):
@@ -179,9 +176,7 @@ class GAN_worker():
             print("Sample Messages: " + str(np.array(messages[0][0])[:10]))
             print("Sample Decoded Messages: " + str(np.array(decoded_messages[0][0])[:10]))
 
-    def evaluate(self, dataset, coding_mode=0):
-        dataset = dataset.take(setting.batch_size)
-        dataset = dataset.shuffle(dataset.cardinality()).batch(setting.batch_size, drop_remainder=True)
+    def evaluate(self, coding_mode=0):
 
         self.generator_metric.reset_state()
         self.discriminator_metric.reset_state()
@@ -195,7 +190,7 @@ class GAN_worker():
         elif coding_mode == 2:
             enable_character_mapping = True
 
-        for batch in dataset:
+        for batch in worker_factory.dw.dataset:
             if enable_hamming:
                 messages = [np.random.choice(2, (setting.batch_size, setting.data_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
             elif enable_character_mapping:
