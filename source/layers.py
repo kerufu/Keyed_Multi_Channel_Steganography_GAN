@@ -127,7 +127,7 @@ class MaskFeature(tf.keras.layers.Layer):
         self.mask = tf.tile(self.mask, [setting.batch_size,1])
         self.message_module = [
             CustomDense(setting.image_size*setting.image_size*setting.AE_feature_size),
-            tf.keras.layers.Dense(setting.image_size*setting.image_size*setting.AE_feature_size, activation="sigmoid"),
+            tf.keras.layers.Dense(setting.image_size*setting.image_size*setting.AE_feature_size, kernel_regularizer=tf.keras.regularizers.L1L2(), activity_regularizer=tf.keras.regularizers.L1L2(), activation="sigmoid"),
             tf.keras.layers.Reshape((setting.image_size, setting.image_size, setting.AE_feature_size))
         ]
 
@@ -147,7 +147,6 @@ class ImageMessageConcatenation(tf.keras.layers.Layer):
         self.arbitary_message_length = not isinstance(setting.message_bit_per_pixel, int)
         if self.arbitary_message_length:
             self.message_module = [
-                CustomDense(self.image_size*self.image_size*(int(setting.message_bit_per_pixel)+1)),
                 CustomDense(self.image_size*self.image_size*(int(setting.message_bit_per_pixel)+1)),
                 CustomDense(self.image_size*self.image_size*(int(setting.message_bit_per_pixel)+1))
             ]
