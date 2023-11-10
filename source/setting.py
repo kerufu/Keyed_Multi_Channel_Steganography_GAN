@@ -1,4 +1,7 @@
 import numpy as np
+import tensorflow as tf
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 image_size = 64
 
@@ -67,7 +70,7 @@ learning_rate = 0.0001
 gradient_clip_norm = None
 weight_decay = None
 
-regularization_weight = 0
+regularization_weight = 0.01
 mse_weight = 100
 
 kernal_clip_value = 0.1
@@ -79,15 +82,15 @@ np.random.seed(0)
 GAN_key = [0] * total_bit_size_per_channel
 # GAN_key = np.random.choice(2, size=total_bit_size_per_channel)
 
-AE_feature_size = 128
-AE_key = np.random.choice(2, size=(image_size, image_size, AE_feature_size))
+AE_feature_size = 64
+AE_key = np.random.choice(2, size=image_size)
 AE_feature_distance_threshold = 0.00296296955
 
 twitter_credential = {
-    "bearer_key": "AAAAAAAAAAAAAAAAAAAAALSkqwEAAAAALv5wu%2BTFlhkGnHJxyWQvJo3Opcc%3DiFJ85iK6k2MM02Ien9prOfgBdo6rdov8kgzgh6NBjuQZN9jRKK",
-    "api_key": "tMEQCcXEmTySJkLILF5IycchS",
-    "api_secret": "xO0bHt6YfpAfvH8ETrBNbQMBWdyEQrEA5wp9xokc34pynxroCg",
-    "access_token": "1721801499179974656-YAVkRZCeH2wDR6uTeAzOJXpWoZ9wjt",
-    "access_token_secret": "ttOPqSxHazyoYWSHWXdnyrLl6siQpcntgstEWbYSk1cZ1"
+    "bearer_key": "AAAAAAAAAAAAAAAAAAAAALSkqwEAAAAApvXQ6X3Um3R%2FLMmGCMpSmz%2BGxYc%3DoeVspNJF3SdPynckE8ORGhalGxz0bFiHUZESZsmcr5nZveaw1t",
+    "api_key": "bxGtlYBwCHDs6wK48Yy6bbT8P",
+    "api_secret": "qXj7IUhOH0JbbAM2wq2A68HfayA1f3rPoN8aDtkAWZ4I0SOQlQ",
+    "access_token": "1721801499179974656-bewsgdBWw7t3DLXF3MrNCpUnsjJUGW",
+    "access_token_secret": "a4R421fvuYUEpxouH9pZVNsIbXagHTTB0rpEAzgmvGUlj"
 }
 

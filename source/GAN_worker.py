@@ -8,7 +8,7 @@ import cv2
 import GAN_definition
 import setting
 import layers
-import worker_factory
+import worker_pool
 
 class GAN_worker():
     def __init__(self, key, generator_iteration=1, discriminator_iteration=1, decoder_iteration=1, wgan=True) -> None:
@@ -19,12 +19,6 @@ class GAN_worker():
         self.generator = GAN_definition.generator(key)
         self.discriminator = GAN_definition.discriminator()
         self.decoders = [GAN_definition.decoder() for _ in range(setting.num_message_channel)]
-
-        self.generator.load_weights(setting.GAN_pathes["generator"])
-        self.discriminator.load_weights(setting.GAN_pathes["discriminator"])
-        for index in range(setting.num_message_channel):
-            self.decoders[index].load_weights(setting.GAN_pathes["decoder"]+str(index))
-        print("GAN model weight loaded")
 
         try:
             self.generator.load_weights(setting.GAN_pathes["generator"])
@@ -134,7 +128,7 @@ class GAN_worker():
             for index in range(setting.num_message_channel):
                 self.decoders_metric[index].reset_state()
             
-            for batch in worker_factory.dw.dataset:
+            for batch in worker_pool.dw.dataset:
                 for _ in range(self.discriminator_iteration):
                     self.train_discriminator(batch)
                 for _ in range(self.generator_iteration):
@@ -190,15 +184,15 @@ class GAN_worker():
         elif coding_mode == 2:
             enable_character_mapping = True
 
-        for batch in worker_factory.dw.dataset:
+        for batch in worker_pool.dw.dataset:
             if enable_hamming:
                 messages = [np.random.choice(2, (setting.batch_size, setting.data_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
             elif enable_character_mapping:
                 messages = []
                 for _ in range(setting.num_message_channel):
-                    m = np.random.choice(list(worker_factory.cm.mapping_table.keys()), (setting.batch_size, setting.num_of_window_per_channel))
+                    m = np.random.choice(list(worker_pool.cm.mapping_table.keys()), (setting.batch_size, setting.num_of_window_per_channel))
                     m = np.expand_dims(m, axis=2)
-                    m = np.apply_along_axis(lambda key: worker_factory.cm.mapping_table[int(key)], axis=2, arr=m)
+                    m = np.apply_along_axis(lambda key: worker_pool.cm.mapping_table[int(key)], axis=2, arr=m)
                     m = tf.concat(m, axis=-1)
                     m = np.array(m)
                     m = m.reshape((-1, setting.total_bit_size_per_channel))
@@ -215,7 +209,7 @@ class GAN_worker():
                     decoded_messages[index] = tf.math.round(decoded_messages[index])
                     decoded_messages[index] = np.array(decoded_messages[index])
                     decoded_messages[index] = decoded_messages[index].reshape((-1, setting.num_of_window_per_channel, setting.coding_window_size))
-                    decoded_messages[index] = np.apply_along_axis(worker_factory.cm.bits_matching, axis=2, arr=decoded_messages[index])
+                    decoded_messages[index] = np.apply_along_axis(worker_pool.cm.bits_matching, axis=2, arr=decoded_messages[index])
                     decoded_messages[index] = decoded_messages[index].astype(np.float32)
                     decoded_messages[index] = decoded_messages[index].reshape((-1, setting.total_bit_size_per_channel))
                     decoded_messages[index] = decoded_messages[index] - 0.5

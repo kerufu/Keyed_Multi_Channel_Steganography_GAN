@@ -1,16 +1,14 @@
 import os
 os.chdir("..")
 
+import worker_pool
 
-import worker_factory
+# worker_pool.ganw.train(50000)
+# worker_pool.ganw.evaluate(coding_mode=0)
 
-# worker_factory.ganw.train(50000)
-# worker_factory.ganw.evaluate(coding_mode=0)
+worker_pool.aew.train(50000)
+# worker_pool.aew.evaluate()
 
-# worker_factory.aew.train(50000)
-# worker_factory.aew.evaluate()
-
-# worker_factory.bw.botnet_simulation()
-# worker_factory.bw.generate_twitter_profile_image()
-# worker_factory.bw.decode_twitter_profile_image()
-
+# worker_pool.bw.botnet_simulation()
+# worker_pool.bw.update_twitter_profile_image()
+# worker_pool.bw.decode_twitter_profile_image()

@@ -123,12 +123,21 @@ class XORMessages(tf.keras.layers.Layer):
 class MaskFeature(tf.keras.layers.Layer):
     def __init__(self, mask):
         super(MaskFeature, self).__init__()
-        self.mask = tf.convert_to_tensor(mask, dtype=tf.float32)
+        self.mask = tf.convert_to_tensor([mask], dtype=tf.float32)
+        self.mask = tf.tile(self.mask, [setting.batch_size,1])
+        self.message_module = [
+            CustomDense(setting.image_size*setting.image_size*setting.AE_feature_size),
+            tf.keras.layers.Dense(setting.image_size*setting.image_size*setting.AE_feature_size, activation="sigmoid"),
+            tf.keras.layers.Reshape((setting.image_size, setting.image_size, setting.AE_feature_size))
+        ]
 
-    def call(self, image):
-        image  = self.mask - image
-        image = tf.abs(image)
-        return image
+    def call(self, feature):
+        mask = tf.identity(self.mask)
+        for mm in self.message_module:
+            mask = mm(mask)
+        feature  = mask - feature
+        feature = tf.abs(feature)
+        return feature
 
 class ImageMessageConcatenation(tf.keras.layers.Layer):
     
@@ -141,7 +150,7 @@ class ImageMessageConcatenation(tf.keras.layers.Layer):
                 CustomDense(self.image_size*self.image_size*(int(setting.message_bit_per_pixel)+1)),
                 CustomDense(self.image_size*self.image_size*(int(setting.message_bit_per_pixel)+1)),
                 CustomDense(self.image_size*self.image_size*(int(setting.message_bit_per_pixel)+1))
-                ]
+            ]
 
     def call(self, image, messages):
         message = tf.cast(tf.concat(messages, 1), tf.float32)

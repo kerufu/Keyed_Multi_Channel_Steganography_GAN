@@ -5,7 +5,7 @@ import numpy as np
 from termcolor import cprint
 import cv2
 
-import worker_factory
+import worker_pool
 import AE_definition
 import setting
 
@@ -13,7 +13,7 @@ class AE_worker():
     def __init__(self, key):
         self.encoder = AE_definition.encoder()
         self.decoder = AE_definition.decoder(key)
-        self.generator = worker_factory.ganw.generator
+        self.generator = worker_pool.ganw.generator
 
         try:
             self.encoder.load_weights(setting.AE_pathes["encoder"])
@@ -73,7 +73,7 @@ class AE_worker():
             self.reconstruction_metric.reset_state()
             self.randomness_metric.reset_state()
             
-            for batch in worker_factory.dw.dataset:
+            for batch in worker_pool.dw.dataset:
                 self.train_step(batch)
 
             image = batch[:1, :]
@@ -98,14 +98,14 @@ class AE_worker():
             print("Randomness Loss: " + str(self.randomness_metric.result().numpy()))
 
     def encode(self, image):
-        image = np.array([worker_factory.dw.preprocess_image(image)])
+        image = np.array([worker_pool.dw.preprocess_image(image)])
         return self.encoder(image)[0]
     
-    def evaluate(self, evaluation_step=100):
+    def evaluate(self, evaluation_step=10):
         distance_match = []
         distance_mismatch = []
         for _ in range(evaluation_step):
-            for batch in worker_factory.dw.dataset:
+            for batch in worker_pool.dw.dataset:
                 messages_1 = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
                 messages_2 = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
                 input_image_1 = self.generator(batch, messages_1)
