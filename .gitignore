@@ -3,4 +3,5 @@ processed_dataset
 saved_model
 
 *.png
+*.jpg
 *.pickle

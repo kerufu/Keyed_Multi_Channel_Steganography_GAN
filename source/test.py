@@ -6,6 +6,9 @@ import character_mapper
 import math
 import cv2
 
+import os
+os.chdir("..")
+
 acc = 0.965
 
 def hamming_test():
@@ -68,11 +71,18 @@ def botnet_metrics(num_redundacy):
     print("num bot: ", setting.total_bit_size//8//num_redundacy)
     print("acc: ", result)
 
-import sys
-import numpy
-numpy.set_printoptions(threshold=sys.maxsize)
-i = cv2.imread("../sample_encoded_image.png", cv2.IMREAD_UNCHANGED)
-print(i.shape)
-print(i[:,:,3])
+def jpeg_compression_testing(image_path):
+    import dataset_worker
+    dw = dataset_worker.dataset_worker()
+    img = dw.preprocess_image(image_path)
+    while True:
+        cv2.imwrite("sample_compressed_image.jpg", (img+1)*127.5)
+        new_img = dw.preprocess_image("sample_compressed_image.jpg")
+        print(np.mean(np.abs(new_img-img)))
+        img = new_img
+        cv2.waitKey(100)
 
-botnet_metrics(128)
+jpeg_compression_testing(setting.sample_encoded_image)
+
+
+
