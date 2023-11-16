@@ -38,7 +38,15 @@ class GAN_worker():
             self.discriminator_loss = layers.WassersteinLoss()
         else:
             self.discriminator_loss = tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=setting.label_smoothing_ratio)
-        self.decoder_loss = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+        self.decoder_loss = [tf.keras.losses.BinaryCrossentropy(from_logits=True) for _ in range(setting.num_message_channel)]
+
+        self.compress_param = [
+            int(cv2.IMWRITE_JPEG_LUMA_QUALITY), 85,
+            int(cv2.IMWRITE_JPEG_CHROMA_QUALITY), 85,
+            int(cv2.IMWRITE_JPEG_PROGRESSIVE), 1,
+            int(cv2.IMWRITE_JPEG_SAMPLING_FACTOR), cv2.IMWRITE_JPEG_SAMPLING_FACTOR_420
+        ]
+        self.compression_loss = tf.keras.losses.MeanSquaredError()
 
         self.generator_metric = tf.keras.metrics.MeanSquaredError()
         self.discriminator_metric = tf.keras.metrics.BinaryAccuracy(threshold=0) # for convenience, handle wgan score in the same way as logit, which is not actual
@@ -48,38 +56,50 @@ class GAN_worker():
         loss = self.generator_loss(input_image, output_image) * setting.mse_weight
         decoders_loss = 0
         for index in range(setting.num_message_channel):
-            decoders_loss += self.decoder_loss(messages[index], decoded_messages[index])
+            decoders_loss += self.decoder_loss[index](messages[index], decoded_messages[index])
         loss += decoders_loss / setting.num_message_channel
         loss += self.discriminator_loss(tf.ones_like(discriminator_ouput_fake), discriminator_ouput_fake)
         loss += tf.add_n(self.generator.losses) * setting.regularization_weight
+
+        if setting.jpeg_compression_loss_weight:
+            compressed_image = np.array(output_image)
+            for _ in range(setting.jpeg_compression_iteration):
+                for index in range(setting.batch_size):
+                    result, ci = cv2.imencode('.jpg', (compressed_image[index, :, :, :]+1)*127.5, self.compress_param)
+                    compressed_image[index, :, :, :] = cv2.imdecode((ci), 1) / 127.5 - 1
+            loss += self.compression_loss(compressed_image, output_image) * setting.jpeg_compression_loss_weight
+
         return loss
     
     def get_discriminator_loss(self, target, output):
         return self.discriminator_loss(target, output) + tf.add_n(self.discriminator.losses) * setting.regularization_weight
     
-
-    @tf.function
     def get_decoder_loss(self, message, decoded_message, index):
-        return self.decoder_loss(message, decoded_message) + tf.add_n(self.decoders[index].losses) * setting.regularization_weight
+        return self.decoder_loss[index](message, decoded_message) + tf.add_n(self.decoders[index].losses) * setting.regularization_weight
     
-    @tf.function
     def train_generator(self, batch):
-        with tf.GradientTape() as generator_tape:
-            messages = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
-            output_image = self.generator(batch, messages, training=True)
+        def train_generator_step(batch):
+            with tf.GradientTape() as generator_tape:
+                messages = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
+                output_image = self.generator(batch, messages, training=True)
 
-            decoded_messages = []
-            for index in range(setting.num_message_channel):
-                decoded_messages.append(self.decoders[index](output_image))
+                decoded_messages = []
+                for index in range(setting.num_message_channel):
+                    decoded_messages.append(self.decoders[index](output_image))
+                
+                discriminator_ouput_fake = self.discriminator(output_image)
+
+                generator_loss = self.get_generator_loss(batch, output_image, messages, decoded_messages, discriminator_ouput_fake)
             
-            discriminator_ouput_fake = self.discriminator(output_image)
+            generator_gradient = generator_tape.gradient(generator_loss, self.generator.trainable_variables)
+            self.generator_opt.apply_gradients(zip(generator_gradient, self.generator.trainable_variables))
 
-            generator_loss = self.get_generator_loss(batch, output_image, messages, decoded_messages, discriminator_ouput_fake)
-        
-        generator_gradient = generator_tape.gradient(generator_loss, self.generator.trainable_variables)
-        self.generator_opt.apply_gradients(zip(generator_gradient, self.generator.trainable_variables))
+            self.generator_metric.update_state(batch, output_image)
 
-        self.generator_metric.update_state(batch, output_image)
+        if setting.jpeg_compression_loss_weight <= 0:
+            train_generator_step = tf.function(train_generator_step)
+
+        return train_generator_step(batch)
 
     @tf.function
     def train_discriminator(self, batch):
@@ -104,19 +124,16 @@ class GAN_worker():
         self.discriminator_metric.update_state(tf.ones_like(discriminator_ouput_true), discriminator_ouput_true)
         self.discriminator_metric.update_state(tf.zeros_like(discriminator_ouput_fake), discriminator_ouput_fake)
 
-    def train_decoder(self, batch, index):
-        with tf.GradientTape() as decoder_tape:
-            messages = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
-            output_image = self.generator(batch, messages)
-
-            decoded_message = self.decoders[index](output_image, training=True)
-
-            decoder_loss = self.get_decoder_loss(messages[index], decoded_message, index)
-
-        decoder_gradient = decoder_tape.gradient(decoder_loss, self.decoders[index].trainable_variables)
-        self.decoder_opts[index].apply_gradients(zip(decoder_gradient, self.decoders[index].trainable_variables))
-
-        self.decoders_metric[index].update_state(messages[index], decoded_message)
+    def train_decoder(self, batch):
+        messages = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
+        for index in range(setting.num_message_channel):
+            with tf.GradientTape() as decoder_tape:
+                output_image = self.generator(batch, messages)
+                decoded_message = self.decoders[index](output_image, training=True)
+                decoder_loss = self.get_decoder_loss(messages[index], decoded_message, index)
+            decoder_gradient = decoder_tape.gradient(decoder_loss, self.decoders[index].trainable_variables)
+            self.decoder_opts[index].apply_gradients(zip(decoder_gradient, self.decoders[index].trainable_variables))
+            self.decoders_metric[index].update_state(messages[index], decoded_message)
 
     def train(self, epoch):
         acc_max = 0
@@ -134,16 +151,15 @@ class GAN_worker():
                 for _ in range(self.generator_iteration):
                     self.train_generator(batch)
                 for _ in range(self.decoder_iteration):
-                    for index in range(setting.num_message_channel):
-                        self.train_decoder(batch, index)
+                    self.train_decoder(batch)
 
             image = batch[:1, :]
             messages = [np.random.choice(2, (1, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
-            decoded_image = self.generator(image, messages)
-            decoded_messages = [self.decoders[index](decoded_image) for index in range(setting.num_message_channel)]
+            encoded_image = self.generator(image, messages)
+            decoded_messages = [self.decoders[index](encoded_image) for index in range(setting.num_message_channel)]
 
             cv2.imwrite(setting.sample_image, np.array((image[0]+1)*127.5))
-            cv2.imwrite(setting.sample_encoded_image, np.array((decoded_image[0]+1)*127.5))
+            cv2.imwrite(setting.sample_encoded_image, np.array((encoded_image[0]+1)*127.5))
             
             cprint('Time for epoch {} is {} sec'.format(epoch_num + 1, time.time()-start), 'red')
 
@@ -171,7 +187,6 @@ class GAN_worker():
             print("Sample Decoded Messages: " + str(np.array(decoded_messages[0][0])[:10]))
 
     def evaluate(self, coding_mode=0):
-
         self.generator_metric.reset_state()
         self.discriminator_metric.reset_state()
         for index in range(setting.num_message_channel):
@@ -200,8 +215,8 @@ class GAN_worker():
             else:
                 messages = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
 
-            decoded_image = self.generator(batch, messages, enable_hamming=enable_hamming)
-            decoded_messages = [self.decoders[index](decoded_image, enable_hamming=enable_hamming) for index in range(setting.num_message_channel)]
+            encoded_image = self.generator(batch, messages, enable_hamming=enable_hamming)
+            decoded_messages = [self.decoders[index](encoded_image, enable_hamming=enable_hamming) for index in range(setting.num_message_channel)]
             
             if enable_character_mapping:
                 for index in range(setting.num_message_channel):
@@ -215,9 +230,9 @@ class GAN_worker():
                     decoded_messages[index] = decoded_messages[index] - 0.5
 
             discriminator_ouput_true = self.discriminator(batch)
-            discriminator_ouput_fake = self.discriminator(decoded_image)
+            discriminator_ouput_fake = self.discriminator(encoded_image)
             
-            self.generator_metric.update_state(batch, decoded_image)
+            self.generator_metric.update_state(batch, encoded_image)
 
             self.discriminator_metric.update_state(tf.ones_like(discriminator_ouput_true), discriminator_ouput_true)
             self.discriminator_metric.update_state(tf.zeros_like(discriminator_ouput_fake), discriminator_ouput_fake)
@@ -228,7 +243,7 @@ class GAN_worker():
             break
 
         cv2.imwrite(setting.sample_image, np.array((batch[0]+1)*127.5))
-        cv2.imwrite(setting.sample_encoded_image, np.array((decoded_image[0]+1)*127.5))
+        cv2.imwrite(setting.sample_encoded_image, np.array((encoded_image[0]+1)*127.5))
 
         print("Image Reconstruction Loss: " + str(self.generator_metric.result().numpy()))
         print("Discriminator Accuracy: " + str(self.discriminator_metric.result().numpy()))
@@ -243,6 +258,3 @@ class GAN_worker():
         print("Message Reconstruction Average Accuracy: " + str(acc_mean))
         print("Sample Messages: " + str(np.array(messages[0][0])[:10]))
         print("Sample Decoded Messages: " + str(np.array(decoded_messages[0][0])[:10]))
-
-
-

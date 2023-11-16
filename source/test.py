@@ -76,13 +76,38 @@ def jpeg_compression_testing(image_path):
     dw = dataset_worker.dataset_worker()
     img = dw.preprocess_image(image_path)
     while True:
-        cv2.imwrite("sample_compressed_image.jpg", (img+1)*127.5)
-        new_img = dw.preprocess_image("sample_compressed_image.jpg")
+        # cv2.imwrite("sample_compressed_image.jpg", (img+1)*127.5)
+        # new_img = dw.preprocess_image("sample_compressed_image.jpg")
+        result, ci = cv2.imencode('.jpg', (img+1)*127.5)
+        new_img = cv2.imdecode((ci), 1) / 127.5 - 1
         print(np.mean(np.abs(new_img-img)))
         img = new_img
-        cv2.waitKey(100)
 
-jpeg_compression_testing(setting.sample_encoded_image)
+        cv2.imwrite(setting.sample_compressed_image, (img+1)*127.5)
+        cv2.waitKey(100)
+        
+def xor_test():
+    import tensorflow as tf
+    model = tf.keras.Sequential(
+    [
+        layers.EncrypteMessage(setting.GAN_key),
+        tf.keras.layers.Dense(setting.total_bit_size_per_channel, activation="tanh"),
+        tf.keras.layers.Dense(setting.total_bit_size_per_channel)
+    ])
+    model.compile(
+        loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+        optimizer=tf.optimizers.Adam(),
+        metrics=tf.keras.metrics.BinaryAccuracy(threshold=0)
+    )
+    for _ in range(100):
+        messages = np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel))
+        model.fit(
+            x=messages,
+            y=messages,
+            batch_size=setting.batch_size
+        )
+
+xor_test()
 
 
 

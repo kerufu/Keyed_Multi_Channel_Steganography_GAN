@@ -3,16 +3,57 @@ import tensorflow as tf
 
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
-image_size = 64
-
 dataset_path = "dataset/"
 processed_dataset_path = "processed_dataset/"
+shuffle_buffer_size_divider = 1
+
+image_size = 64
+batch_size = 10
+
+GAN_pathes = {
+    "generator": "saved_model/GAN/generator",
+    "discriminator": "saved_model/GAN/discriminator",
+    "decoder": "saved_model/GAN/decoder_",
+}
+
+AE_pathes = {
+    "encoder": "saved_model/AE/encoder",
+    "decoder": "saved_model/AE/decoder",
+}
+
+sample_image = "sample_image.png"
+sample_encoded_image = "sample_encoded_image.png"
+sample_downloaded_image = "sample_downloaded_image.png"
+sample_reconstructed_image = "sample_reconstructed_image.png"
+sample_compressed_image = "sample_compressed_image.jpg"
+
+label_smoothing_ratio = 0.1
+
+learning_rate = 0.0001
+gradient_clip_norm = None
+weight_decay = None
+
+dropout_ratio = 0.1
+regularization_weight = 0
+mse_weight = 100
+
+kernal_clip_value = 0.1
+
+jpeg_compression_iteration = 20
+jpeg_compression_loss_weight = 0
+
+np.random.seed(0)
+key_size = 16
+GAN_key = np.random.choice(2, size=key_size)
+AE_key = np.random.choice(2, size=key_size)
+
+AE_feature_size = 64
 
 num_message_channel = 4
 
 message_bit_per_pixel = 1
-total_bit_size = int(image_size*image_size*message_bit_per_pixel)
-total_bit_size_per_channel = total_bit_size // num_message_channel
+total_bit_size_per_channel = (image_size * image_size * message_bit_per_pixel) // num_message_channel
+total_bit_size = total_bit_size_per_channel * num_message_channel
 
 coding_window_size = 8
 
@@ -43,48 +84,6 @@ vulnerable_command = {
         ]
     }
 command_set_seed = 7
-
-GAN_pathes = {
-    "generator": "saved_model/GAN/generator",
-    "discriminator": "saved_model/GAN/discriminator",
-    "decoder": "saved_model/GAN/decoder",
-}
-
-AE_pathes = {
-    "encoder": "saved_model/AE/encoder",
-    "decoder": "saved_model/AE/decoder",
-}
-
-batch_size = 50
-
-dropout_ratio = 0.25
-
-sample_image = "sample_image.png"
-sample_encoded_image = "sample_encoded_image.png"
-sample_downloaded_image = "sample_downloaded_image.png"
-sample_reconstructed_image = "sample_reconstructed_image.png"
-
-label_smoothing_ratio = 0.1
-
-learning_rate = 0.0001
-gradient_clip_norm = None
-weight_decay = None
-
-regularization_weight = 0.01
-mse_weight = 100
-
-kernal_clip_value = 0.1
-
-shuffle_buffer_size_divider = 1
-
-np.random.seed(0)
-
-GAN_key = [0] * total_bit_size_per_channel
-# GAN_key = np.random.choice(2, size=total_bit_size_per_channel)
-
-AE_feature_size = 64
-AE_key = np.random.choice(2, size=image_size)
-AE_feature_distance_threshold = 0.00296296955
 
 twitter_credential = {
     "bearer_key": "AAAAAAAAAAAAAAAAAAAAALSkqwEAAAAApvXQ6X3Um3R%2FLMmGCMpSmz%2BGxYc%3DoeVspNJF3SdPynckE8ORGhalGxz0bFiHUZESZsmcr5nZveaw1t",
