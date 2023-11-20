@@ -113,38 +113,58 @@ class ClipConstraint(tf.keras.constraints.Constraint):
         return {'kernal_clip_value': setting.kernal_clip_value}
 
 class EncrypteMessage(tf.keras.layers.Layer):
-    def __init__(self, key):
+    def __init__(self, key, xor=True):
         super(EncrypteMessage, self).__init__()
-        self.key = tf.repeat(key, repeats=setting.total_bit_size_per_channel//setting.key_size)
-        self.key = tf.cast(self.key, tf.float32)
-        self.key /= 2
+        self.xor = xor
+
+        self.key = tf.repeat(key, repeats=setting.image_size//setting.key_size, axis=0)
+        self.key = tf.repeat([self.key], repeats=setting.image_size//setting.num_message_channel, axis=0)
+        self.key = tf.repeat([self.key], repeats=setting.message_bit_per_pixel, axis=0)
+        self.key = tf.reshape(self.key, [-1])
+
+        if not self.xor:
+            self.key = tf.repeat([self.key], repeats=setting.batch_size, axis=0)
+            self.key = tf.cast(self.key, tf.float32) - 0.5
 
     def call(self, message):
+        if self.xor:
+            message = tf.bitwise.bitwise_xor(message, self.key)
+
         message = tf.cast(message, tf.float32)
-        message = message + self.key
+        message = message * 2 - 1
+
+        if not self.xor:
+            message = message + self.key
+
         return message
 
 class MaskFeature(tf.keras.layers.Layer):
     def __init__(self, mask):
         super(MaskFeature, self).__init__()
-        self.mask = tf.repeat(mask, repeats=setting.image_size*setting.image_size//setting.key_size)
-        self.mask = tf.reshape(self.mask, shape=(setting.image_size, setting.image_size))
-        self.mask = tf.convert_to_tensor([mask], dtype=tf.float32)
-        self.mask = tf.tile(self.mask, [setting.batch_size,1])
-        self.mask /= 2
+        self.mask = tf.repeat(mask, repeats=setting.image_size//setting.key_size)
+        self.mask = tf.repeat([self.mask], repeats=setting.image_size)
+        self.mask = tf.repeat([self.mask], repeats=setting.batch_size, axis=0)
+        self.mask = tf.convert_to_tensor(mask, dtype=tf.float32)
+        self.mask -= 0.5
 
     def call(self, feature):
-        feature  = self.mask + feature
+        feature = feature * 2 - 1
+        feature = self.mask + feature
         return feature
 
 class ImageMessageConcatenation(tf.keras.layers.Layer):
     
     def __init__(self):
         super(ImageMessageConcatenation, self).__init__()
-        self.message_module = [
-            CustomDense(setting.image_size*setting.image_size*(int(setting.message_bit_per_pixel)+1)),
-            tf.keras.layers.Reshape((setting.image_size, setting.image_size, (int(setting.message_bit_per_pixel)+1)))
-        ]
+        if isinstance(setting.message_bit_per_pixel, int):
+            self.message_module = [
+                tf.keras.layers.Reshape((setting.image_size, setting.image_size, setting.message_bit_per_pixel))
+            ]
+        else:
+            self.message_module = [
+                CustomDense(setting.image_size*setting.image_size*(int(setting.message_bit_per_pixel)+1)),
+                tf.keras.layers.Reshape((setting.image_size, setting.image_size, (int(setting.message_bit_per_pixel)+1)))
+            ]
 
     def call(self, image, messages):
         messages = tf.concat(messages, 1)
@@ -164,7 +184,7 @@ class ReflectRadding(tf.keras.layers.Layer): # O=[(W−K+P)/S]+1
 
 class CustomConv2d(tf.keras.layers.Layer):
 
-    def __init__(self, num_channel, kernel_size, reflect_padding=False, scale_down_mode=0, clip_kernal=False, dropout=False, activation="leaky_relu"):
+    def __init__(self, num_channel, kernel_size, reflect_padding=False, scale_down_mode=0, clip_kernal=False, activation="leaky_relu"):
         super(CustomConv2d, self).__init__()
 
         kernel_constraint = None
@@ -207,7 +227,7 @@ class CustomConv2d(tf.keras.layers.Layer):
             tf.keras.layers.Activation(activation),
             tf.keras.layers.BatchNormalization()
         ]
-        if dropout:
+        if setting.dropout_ratio:
             self.module.append(tf.keras.layers.Dropout(setting.dropout_ratio))
 
     def call(self, x, training):
@@ -220,7 +240,7 @@ class CustomConv2d(tf.keras.layers.Layer):
 
 class CustomDense(tf.keras.layers.Layer):
 
-    def __init__(self, output_size, clip_kernal=False, dropout=False, activation="leaky_relu"):
+    def __init__(self, output_size, clip_kernal=False, activation="leaky_relu"):
         super(CustomDense, self).__init__()
 
         kernel_constraint = None
@@ -232,7 +252,7 @@ class CustomDense(tf.keras.layers.Layer):
             tf.keras.layers.Activation(activation),
             tf.keras.layers.BatchNormalization()
         ]
-        if dropout:
+        if setting.dropout_ratio:
             self.module.append(tf.keras.layers.Dropout(setting.dropout_ratio))
 
     def call(self, x, training):

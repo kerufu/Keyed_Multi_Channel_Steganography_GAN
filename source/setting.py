@@ -33,17 +33,18 @@ learning_rate = 0.0001
 gradient_clip_norm = None
 weight_decay = None
 
-dropout_ratio = 0.1
+dropout_ratio = 0
 regularization_weight = 0
-mse_weight = 100
+mse_weight = 80
+decoder_weight = 10
+
+jpeg_compression_loss_weight = 0
+jpeg_compression_iteration = 20
 
 kernal_clip_value = 0.1
 
-jpeg_compression_iteration = 20
-jpeg_compression_loss_weight = 0
-
 np.random.seed(0)
-key_size = 16
+key_size = 32
 GAN_key = np.random.choice(2, size=key_size)
 AE_key = np.random.choice(2, size=key_size)
 
@@ -75,13 +76,8 @@ mapping_table_path = "character_mapping_table.pickle"
 
 command_set_path = "command_set.pickle"
 vulnerable_command = {
-    True: [247, 8, 62],
-    False: [
-        0, 1, 128, 2, 4, 3, 6, 129, 8, 12, 16, 24,
-        159, 32, 175, 48, 191, 64, 63, 192, 207, 223,
-        231, 239, 243, 252, 247, 249, 126, 251, 127,
-        253, 254, 255, 96, 235, 95, 199, 245, 250, 62, 56, 227
-        ]
+    True: [],
+    False: []
     }
 command_set_seed = 7
 

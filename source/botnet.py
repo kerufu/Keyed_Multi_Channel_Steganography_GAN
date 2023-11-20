@@ -63,17 +63,19 @@ class botnet_worker():
 
         return command
 
-    def botnet_simulation(self, character_mapping=False, simulate_step=1000):
+    def botnet_simulation(self, character_mapping=False, simulate_step=1000000):
         if character_mapping:
             command_table = list(worker_pool.cm.mapping_table.keys())
         else:
             command_table = list(range(2**setting.coding_window_size))
 
         for vc in setting.vulnerable_command[character_mapping]:
-            command_table.remove(vc)
+            if vc in command_table:
+                command_table.remove(vc)
 
         vul_cmd = set([])
         for _ in range(simulate_step):
+
             commands = np.random.choice(command_table, setting.num_message_channel)
             self.botmaster_process(setting.sample_image, commands)
             decoded_commands = []
@@ -83,7 +85,8 @@ class botnet_worker():
                 if commands[index] != decoded_commands[index]:
                     print("command error: ", commands[index], decoded_commands[index])
                     vul_cmd.add(commands[index])
-                    print(vul_cmd)
+                    command_table.remove(commands[index])
+        print("vulnerable command: ", vul_cmd)
 
     def update_twitter_profile_image(self, character_mapping=False):
         command_table = list(range(2**setting.coding_window_size))

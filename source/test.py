@@ -1,13 +1,15 @@
+import os
+os.chdir("..")
+
 import layers
 
 import numpy as np
 import setting
-import character_mapper
+import worker_pool
 import math
 import cv2
+import tensorflow as tf
 
-import os
-os.chdir("..")
 
 acc = 0.965
 
@@ -31,7 +33,7 @@ def hamming_test():
 
 def character_mapper_evaluate():
 
-    cm = character_mapper.character_mapper()
+    cm = worker_pool.cm
     print(cm.mapping_table.keys())
 
     dis_sum = 0
@@ -87,7 +89,6 @@ def jpeg_compression_testing(image_path):
         cv2.waitKey(100)
         
 def xor_test():
-    import tensorflow as tf
     model = tf.keras.Sequential(
     [
         layers.EncrypteMessage(setting.GAN_key),
@@ -107,7 +108,8 @@ def xor_test():
             batch_size=setting.batch_size
         )
 
-xor_test()
+character_mapper_evaluate()
+
 
 
 

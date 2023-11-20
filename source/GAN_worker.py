@@ -51,29 +51,36 @@ class GAN_worker():
         self.generator_metric = tf.keras.metrics.MeanSquaredError()
         self.discriminator_metric = tf.keras.metrics.BinaryAccuracy(threshold=0) # for convenience, handle wgan score in the same way as logit, which is not actual
         self.decoders_metric = [tf.keras.metrics.BinaryAccuracy(threshold=0) for _ in range(setting.num_message_channel)]
+        self.compression_metric = tf.keras.metrics.MeanSquaredError()
+
+    def compress_image(self, image):
+        compressed_image = np.array(image)
+        for _ in range(setting.jpeg_compression_iteration):
+            for index in range(setting.batch_size):
+                result, ci = cv2.imencode('.jpg', (compressed_image[index, :, :, :]+1)*127.5, self.compress_param)
+                compressed_image[index, :, :, :] = cv2.imdecode((ci), 1) / 127.5 - 1
+        return compressed_image
 
     def get_generator_loss(self, input_image, output_image, messages, decoded_messages, discriminator_ouput_fake):
         loss = self.generator_loss(input_image, output_image) * setting.mse_weight
         decoders_loss = 0
         for index in range(setting.num_message_channel):
             decoders_loss += self.decoder_loss[index](messages[index], decoded_messages[index])
-        loss += decoders_loss / setting.num_message_channel
+        loss += decoders_loss / setting.num_message_channel * setting.decoder_weight
         loss += self.discriminator_loss(tf.ones_like(discriminator_ouput_fake), discriminator_ouput_fake)
         loss += tf.add_n(self.generator.losses) * setting.regularization_weight
 
         if setting.jpeg_compression_loss_weight:
-            compressed_image = np.array(output_image)
-            for _ in range(setting.jpeg_compression_iteration):
-                for index in range(setting.batch_size):
-                    result, ci = cv2.imencode('.jpg', (compressed_image[index, :, :, :]+1)*127.5, self.compress_param)
-                    compressed_image[index, :, :, :] = cv2.imdecode((ci), 1) / 127.5 - 1
-            loss += self.compression_loss(compressed_image, output_image) * setting.jpeg_compression_loss_weight
+            compressed_image = self.compress_image(output_image)
+            loss += self.compression_loss(output_image, compressed_image) * setting.jpeg_compression_loss_weight
+            self.compression_metric.update_state(output_image, compressed_image)
 
         return loss
     
     def get_discriminator_loss(self, target, output):
         return self.discriminator_loss(target, output) + tf.add_n(self.discriminator.losses) * setting.regularization_weight
     
+    @tf.function
     def get_decoder_loss(self, message, decoded_message, index):
         return self.decoder_loss[index](message, decoded_message) + tf.add_n(self.decoders[index].losses) * setting.regularization_weight
     
@@ -144,6 +151,8 @@ class GAN_worker():
             self.discriminator_metric.reset_state()
             for index in range(setting.num_message_channel):
                 self.decoders_metric[index].reset_state()
+            if setting.jpeg_compression_loss_weight:
+                self.compression_metric.reset_state()
             
             for batch in worker_pool.dw.dataset:
                 for _ in range(self.discriminator_iteration):
@@ -164,6 +173,8 @@ class GAN_worker():
             cprint('Time for epoch {} is {} sec'.format(epoch_num + 1, time.time()-start), 'red')
 
             print("Image Reconstruction Loss: " + str(self.generator_metric.result().numpy()))
+            if setting.jpeg_compression_loss_weight:
+                print("Image Compression Loss: " + str(self.compression_metric.result().numpy()))
             print("Discriminator Accuracy: " + str(self.discriminator_metric.result().numpy()))
 
             acc_list = []
@@ -191,6 +202,8 @@ class GAN_worker():
         self.discriminator_metric.reset_state()
         for index in range(setting.num_message_channel):
             self.decoders_metric[index].reset_state()
+        if setting.jpeg_compression_loss_weight:
+            self.compression_metric.reset_state()
 
         enable_hamming = False
         enable_character_mapping= False
@@ -210,7 +223,7 @@ class GAN_worker():
                     m = np.apply_along_axis(lambda key: worker_pool.cm.mapping_table[int(key)], axis=2, arr=m)
                     m = tf.concat(m, axis=-1)
                     m = np.array(m)
-                    m = m.reshape((-1, setting.total_bit_size_per_channel))
+                    m = m.reshape((-1, setting.total_bit_size_per_channel)).astype(int)
                     messages.append(m)
             else:
                 messages = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
@@ -233,6 +246,9 @@ class GAN_worker():
             discriminator_ouput_fake = self.discriminator(encoded_image)
             
             self.generator_metric.update_state(batch, encoded_image)
+            if setting.jpeg_compression_loss_weight:
+                compressed_image = self.compress_image(encoded_image)
+                self.compression_metric.update_state(encoded_image, compressed_image)
 
             self.discriminator_metric.update_state(tf.ones_like(discriminator_ouput_true), discriminator_ouput_true)
             self.discriminator_metric.update_state(tf.zeros_like(discriminator_ouput_fake), discriminator_ouput_fake)
@@ -246,6 +262,8 @@ class GAN_worker():
         cv2.imwrite(setting.sample_encoded_image, np.array((encoded_image[0]+1)*127.5))
 
         print("Image Reconstruction Loss: " + str(self.generator_metric.result().numpy()))
+        if setting.jpeg_compression_loss_weight:
+            print("Image Compression Loss: " + str(self.compression_metric.result().numpy()))
         print("Discriminator Accuracy: " + str(self.discriminator_metric.result().numpy()))
         
         acc_list = []
