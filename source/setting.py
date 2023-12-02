@@ -29,6 +29,8 @@ sample_compressed_image = "sample_compressed_image.jpg"
 
 label_smoothing_ratio = 0.1
 
+kernal_clip_value = 0.1
+
 learning_rate = 0.0001
 gradient_clip_norm = None
 weight_decay = None
@@ -40,8 +42,6 @@ decoder_weight = 10
 
 jpeg_compression_loss_weight = 0
 jpeg_compression_iteration = 20
-
-kernal_clip_value = 0.1
 
 np.random.seed(0)
 key_size = 32

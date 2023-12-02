@@ -16,6 +16,7 @@ class botnet_worker():
             setting.twitter_credential["api_key"], setting.twitter_credential["api_secret"],
             setting.twitter_credential["access_token"], setting.twitter_credential["access_token_secret"]
         ), wait_on_rate_limit=True)
+        
         # self.twitter_client = tweepy.Client(
         #     consumer_key=setting.twitter_credential["api_key"], consumer_secret=setting.twitter_credential["api_secret"],
         #     access_token=setting.twitter_credential["access_token"], access_token_secret=setting.twitter_credential["access_token_secret"],
@@ -63,7 +64,7 @@ class botnet_worker():
 
         return command
 
-    def botnet_simulation(self, character_mapping=False, simulate_step=1000000):
+    def botnet_simulation(self, character_mapping=False, simulate_step=100000):
         if character_mapping:
             command_table = list(worker_pool.cm.mapping_table.keys())
         else:
