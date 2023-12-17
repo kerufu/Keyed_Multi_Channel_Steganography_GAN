@@ -15,7 +15,7 @@ class dataset_worker():
     def load_dataset(self, dataset_path, processed_dataset_path):
         print("load data from raw")
         data = []
-        for path in glob.iglob(dataset_path+"*.jpg"):
+        for path in list(glob.iglob(dataset_path+"*.jpg"))[:setting.batch_size*setting.num_batch]:
 
             img = self.preprocess_image(path)
             data.append(img)

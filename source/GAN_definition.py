@@ -42,6 +42,11 @@ class generator(tf.keras.Model):
             return tf.clip_by_value(image+output_feature, clip_value_min=-1, clip_value_max=1)
         else:
             return (image + output_feature) / 2
+        
+    def model(self):
+        image_input = tf.keras.Input(shape=(setting.image_size, setting.image_size, 3), dtype='float32', name='image_input')
+        message_input = [tf.keras.Input(shape=(setting.total_bit_size_per_channel,), dtype='int64', name='message_input_'+str(index)) for index in range(setting.num_message_channel)]
+        return tf.keras.Model(inputs=[image_input, message_input], outputs=self.call(image_input, message_input))
 
 class discriminator(tf.keras.Model):
     def __init__(self):
@@ -60,6 +65,10 @@ class discriminator(tf.keras.Model):
             else:
                 x = layer(x)
         return tf.reduce_mean(x, axis=[1, 2, 3])
+    
+    def model(self):
+        image_input = tf.keras.Input(shape=(setting.image_size, setting.image_size, 3), dtype='float32', name='image_input')
+        return tf.keras.Model(inputs=[image_input], outputs=self.call(image_input))
     
 class decoder(tf.keras.Model):
     def __init__(self):
@@ -96,3 +105,7 @@ class decoder(tf.keras.Model):
             x = x - 0.5
         
         return x
+    
+    def model(self):
+        image_input = tf.keras.Input(shape=(setting.image_size, setting.image_size, 3), dtype='float32', name='image_input')
+        return tf.keras.Model(inputs=[image_input], outputs=self.call(image_input))

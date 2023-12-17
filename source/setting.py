@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import tensorflow as tf
 
@@ -8,7 +10,8 @@ processed_dataset_path = "processed_dataset/"
 shuffle_buffer_size_divider = 1
 
 image_size = 64
-batch_size = 10
+batch_size = 100
+num_batch = 1
 
 GAN_pathes = {
     "generator": "saved_model/GAN/generator",
@@ -47,6 +50,7 @@ np.random.seed(0)
 key_size = 32
 GAN_key = np.random.choice(2, size=key_size)
 AE_key = np.random.choice(2, size=key_size)
+np.random.seed(int(time.time()))
 
 AE_feature_size = 64
 

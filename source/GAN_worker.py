@@ -33,6 +33,10 @@ class GAN_worker():
         self.discriminator_opt = tf.keras.optimizers.RMSprop(learning_rate=setting.learning_rate, clipnorm=setting.gradient_clip_norm, weight_decay=setting.weight_decay)
         self.decoder_opts = [tf.keras.optimizers.Adam(learning_rate=setting.learning_rate, clipnorm=setting.gradient_clip_norm, weight_decay=setting.weight_decay) for _ in range(setting.num_message_channel)]
 
+        # self.generator_opt = tf.keras.optimizers.legacy.Adam(learning_rate=setting.learning_rate)
+        # self.discriminator_opt = tf.keras.optimizers.legacy.RMSprop(learning_rate=setting.learning_rate)
+        # self.decoder_opts = [tf.keras.optimizers.legacy.Adam(learning_rate=setting.learning_rate) for _ in range(setting.num_message_channel)]
+
         self.generator_loss = tf.keras.losses.MeanSquaredError()
         if wgan:
             self.discriminator_loss = layers.WassersteinLoss()
@@ -276,3 +280,9 @@ class GAN_worker():
         print("Message Reconstruction Average Accuracy: " + str(acc_mean))
         print("Sample Messages: " + str(np.array(messages[0][0])[:10]))
         print("Sample Decoded Messages: " + str(np.array(decoded_messages[0][0])[:10]))
+
+    def plot(self):
+        tf.keras.utils.plot_model(self.generator.model(), "generator.png", show_shapes=True)
+        tf.keras.utils.plot_model(self.discriminator.model(), "discriminator.png", show_shapes=True)
+        for index in range(setting.num_message_channel):
+            tf.keras.utils.plot_model(self.decoders[index].model(), "decoder_"+str(index) +".png", show_shapes=True)
