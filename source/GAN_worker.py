@@ -72,7 +72,8 @@ class GAN_worker():
             decoders_loss += self.decoder_loss[index](messages[index], decoded_messages[index])
         loss += decoders_loss / setting.num_message_channel * setting.decoder_weight
         loss += self.discriminator_loss(tf.ones_like(discriminator_ouput_fake), discriminator_ouput_fake)
-        loss += tf.add_n(self.generator.losses) * setting.regularization_weight
+        if len(self.generator.losses) > 0 and setting.regularization_weight > 0:
+            loss += tf.add_n(self.generator.losses) * setting.regularization_weight
 
         if setting.jpeg_compression_loss_weight:
             compressed_image = self.compress_image(output_image)
@@ -82,11 +83,17 @@ class GAN_worker():
         return loss
     
     def get_discriminator_loss(self, target, output):
-        return self.discriminator_loss(target, output) + tf.add_n(self.discriminator.losses) * setting.regularization_weight
+        loss = self.discriminator_loss(target, output)
+        if len(self.discriminator.losses) > 0 and setting.regularization_weight > 0:
+            loss += tf.add_n(self.discriminator.losses) * setting.regularization_weight
+        return loss
     
     @tf.function
     def get_decoder_loss(self, message, decoded_message, index):
-        return self.decoder_loss[index](message, decoded_message) + tf.add_n(self.decoders[index].losses) * setting.regularization_weight
+        loss = self.decoder_loss[index](message, decoded_message)
+        if len(self.decoders[index].losses) > 0 and setting.regularization_weight > 0:
+            loss += tf.add_n(self.decoders[index].losses) * setting.regularization_weight
+        return loss
     
     def train_generator(self, batch):
         def train_generator_step(batch):

@@ -105,6 +105,16 @@ class WassersteinLoss(tf.keras.losses.Loss):
         y_true = y_true * 2 - 1
         return -tf.math.reduce_mean(y_true*y_pred)
 
+class HardTanh(tf.keras.layers.Layer):
+    def call(self, x):
+        return tf.minimum(tf.maximum(x, -1), 1)
+
+class HardSwish(tf.keras.layers.Layer):
+    def call(self, x):
+        x = tf.where(tf.less_equal(x, -3), 0.0, x)
+        x = tf.where(tf.logical_and(tf.greater(x, -3), tf.less(x, 3)), (x*(x+3))/6, x)
+        return x
+
 class ClipConstraint(tf.keras.constraints.Constraint):
     def __call__(self, weights):
         return tf.keras.backend.clip(weights, -setting.kernal_clip_value, setting.kernal_clip_value)
@@ -182,51 +192,57 @@ class ReflectRadding(tf.keras.layers.Layer): # O=[(W−K+P)/S]+1
     def call(self, x):
         return tf.pad(x, [[0, 0], [self.upper_pad, self.lower_pad], [self.upper_pad, self.lower_pad], [0, 0]], 'REFLECT')
 
-class CustomConv2d(tf.keras.layers.Layer):
+class CustomConv2D(tf.keras.layers.Layer):
 
-    def __init__(self, num_channel, kernel_size, reflect_padding=False, scale_down_mode=0, clip_kernal=False, activation="leaky_relu"):
-        super(CustomConv2d, self).__init__()
+    def __init__(self, num_channel, kernel_size, reflect_padding=False, scale_down_mode=0, clip_kernal=False, activation="hswish", depthwise_seperable=False):
+        super(CustomConv2D, self).__init__()
 
         kernel_constraint = None
         if clip_kernal:
             kernel_constraint = ClipConstraint()
 
+        if depthwise_seperable:
+            Conv2D = tf.keras.layers.SeparableConv2D
+        else:
+            Conv2D = tf.keras.layers.Conv2D
+
         if reflect_padding:
             if scale_down_mode == 0:
                 self.module = [
                     ReflectRadding(kernel_size),
-                    tf.keras.layers.Conv2D(num_channel, kernel_size, kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
+                    Conv2D(num_channel, kernel_size, kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
                 ]
             elif scale_down_mode == 1:
                 self.module = [
                     ReflectRadding(kernel_size),
-                    tf.keras.layers.Conv2D(num_channel, kernel_size, strides=2, kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
+                    Conv2D(num_channel, kernel_size, strides=2, kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
                 ]
             elif scale_down_mode == 2:
                 self.module = [
                     ReflectRadding(kernel_size),
-                    tf.keras.layers.Conv2D(num_channel, kernel_size, kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
+                    Conv2D(num_channel, kernel_size, kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
                     tf.keras.layers.MaxPool2D(),
                 ]
         else:
             if scale_down_mode == 0:
                 self.module = [
-                    tf.keras.layers.Conv2D(num_channel, kernel_size, padding='same', kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
+                    Conv2D(num_channel, kernel_size, padding='same', kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
                 ]
             elif scale_down_mode == 1:
                 self.module = [
-                    tf.keras.layers.Conv2D(num_channel, kernel_size, strides=2, padding='same', kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
+                    Conv2D(num_channel, kernel_size, strides=2, padding='same', kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
                 ]
             elif scale_down_mode == 2:
                 self.module = [
-                    tf.keras.layers.Conv2D(num_channel, kernel_size, padding='same', kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
+                    Conv2D(num_channel, kernel_size, padding='same', kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
                     tf.keras.layers.MaxPool2D(),
                 ]
 
-        self.module += [
-            tf.keras.layers.Activation(activation),
-            tf.keras.layers.BatchNormalization()
-        ]
+        self.module.append(tf.keras.layers.BatchNormalization())
+        if activation == "hswish":
+            self.module.append(HardSwish())
+        else:
+            self.module.append(tf.keras.layers.Activation(activation))
         if setting.dropout_ratio:
             self.module.append(tf.keras.layers.Dropout(setting.dropout_ratio))
 
@@ -249,8 +265,8 @@ class CustomDense(tf.keras.layers.Layer):
 
         self.module = [
             tf.keras.layers.Dense(output_size, kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
-            tf.keras.layers.Activation(activation),
-            tf.keras.layers.BatchNormalization()
+            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.Activation(activation)
         ]
         if setting.dropout_ratio:
             self.module.append(tf.keras.layers.Dropout(setting.dropout_ratio))

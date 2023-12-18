@@ -4,20 +4,21 @@ import setting
 import layers
 
 class generator(tf.keras.Model):
-    def __init__(self, key, clip_residual=True):
+    def __init__(self, key, clip_residual=False):
         super(generator, self).__init__()
         self.hamming_layer = layers.HammingCode()
         self.clip_residual = clip_residual
         self.input_module = [
-            layers.CustomConv2d(32, 3, reflect_padding=True),
+            layers.CustomConv2D(32, 3, reflect_padding=True),
         ]
         self.xor_layer = layers.EncrypteMessage(key)
         self.concat_layer = layers.ImageMessageConcatenation()
         self.output_module = [
-            layers.CustomConv2d(32, 3, reflect_padding=True),
-            layers.CustomConv2d(32, 3, reflect_padding=True),
+            layers.CustomConv2D(32, 3, reflect_padding=True, depthwise_seperable=True),
+            layers.CustomConv2D(32, 3, reflect_padding=True, activation="leaky_relu"),
             layers.ReflectRadding(3),
-            tf.keras.layers.Conv2D(3, 3, activation="tanh")
+            tf.keras.layers.Conv2D(3, 3),
+            layers.HardTanh()
         ]
 
     def call(self, image, messages, enable_hamming=False, training=False):
@@ -38,6 +39,7 @@ class generator(tf.keras.Model):
         middle_features.append(self.output_module[1](tf.concat(middle_features, -1), training)) # a, M, b, c
 
         output_feature = self.output_module[3](self.output_module[2](tf.concat(middle_features, -1)))
+        output_feature = self.output_module[4](output_feature)
         if self.clip_residual:
             return tf.clip_by_value(image+output_feature, clip_value_min=-1, clip_value_max=1)
         else:
@@ -52,10 +54,10 @@ class discriminator(tf.keras.Model):
     def __init__(self):
         super(discriminator, self).__init__()
         self.module = [
-            layers.CustomConv2d(32, 3, clip_kernal=True),
-            layers.CustomConv2d(32, 3, clip_kernal=True),
-            layers.CustomConv2d(32, 3, clip_kernal=True),
-            tf.keras.layers.Conv2D(1, 3, padding='same', kernel_constraint=layers.ClipConstraint())
+            layers.CustomConv2D(32, 3, scale_down_mode=1, clip_kernal=True, depthwise_seperable=True),
+            layers.CustomConv2D(32, 3, scale_down_mode=1, clip_kernal=True, activation="leaky_relu"),
+            layers.CustomConv2D(32, 3, scale_down_mode=1, clip_kernal=True, activation="leaky_relu"),
+            tf.keras.layers.Conv2D(1, 3, kernel_constraint=layers.ClipConstraint())
         ]
 
     def call(self, x, training=False):
@@ -74,10 +76,10 @@ class decoder(tf.keras.Model):
     def __init__(self):
         super(decoder, self).__init__()
         self.input_module = [   
-            layers.CustomConv2d(32, 3),
-            layers.CustomConv2d(32, 3),
-            layers.CustomConv2d(32, 3),
-            layers.CustomConv2d(32, 3),
+            layers.CustomConv2D(32, 3, depthwise_seperable=True),
+            layers.CustomConv2D(32, 3, depthwise_seperable=True),
+            layers.CustomConv2D(32, 3, depthwise_seperable=True),
+            layers.CustomConv2D(32, 3)
         ]
         self.output_module = [
             tf.keras.layers.Flatten(),

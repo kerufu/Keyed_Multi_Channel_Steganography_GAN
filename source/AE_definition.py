@@ -7,8 +7,8 @@ class encoder(tf.keras.Model):
     def __init__(self):
         super(encoder, self).__init__()
         self.module = [
-            layers.CustomConv2d(16, 3, reflect_padding=True),
-            layers.CustomConv2d(32, 3, reflect_padding=True),
+            layers.CustomConv2D(16, 3, reflect_padding=True),
+            layers.CustomConv2D(32, 3, reflect_padding=True),
             layers.ReflectRadding(3), 
             tf.keras.layers.Conv2D(setting.AE_feature_size, 3, activation="sigmoid", kernel_regularizer=tf.keras.regularizers.L1L2(), activity_regularizer=tf.keras.regularizers.L1L2())
         ]
@@ -26,8 +26,8 @@ class decoder(tf.keras.Model):
         super(decoder, self).__init__()
         self.output_module = [
             layers.MaskFeature(key),
-            layers.CustomConv2d(32, 3, reflect_padding=True),
-            layers.CustomConv2d(16, 3, reflect_padding=True),
+            layers.CustomConv2D(32, 3, reflect_padding=True),
+            layers.CustomConv2D(16, 3, reflect_padding=True),
             layers.ReflectRadding(3), 
             tf.keras.layers.Conv2D(3, 3, activation="tanh")
         ]
