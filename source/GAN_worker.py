@@ -16,7 +16,7 @@ class GAN_worker():
         self.discriminator_iteration = discriminator_iteration
         self.decoder_iteration = decoder_iteration
 
-        self.generator = GAN_definition.generator(key)
+        self.generator = GAN_definition.generator(key, clip_residual=False)
         self.discriminator = GAN_definition.discriminator()
         self.decoders = [GAN_definition.decoder() for _ in range(setting.num_message_channel)]
 
@@ -32,10 +32,6 @@ class GAN_worker():
         self.generator_opt = tf.keras.optimizers.Adam(learning_rate=setting.learning_rate, clipnorm=setting.gradient_clip_norm, weight_decay=setting.weight_decay)
         self.discriminator_opt = tf.keras.optimizers.RMSprop(learning_rate=setting.learning_rate, clipnorm=setting.gradient_clip_norm, weight_decay=setting.weight_decay)
         self.decoder_opts = [tf.keras.optimizers.Adam(learning_rate=setting.learning_rate, clipnorm=setting.gradient_clip_norm, weight_decay=setting.weight_decay) for _ in range(setting.num_message_channel)]
-
-        # self.generator_opt = tf.keras.optimizers.legacy.Adam(learning_rate=setting.learning_rate)
-        # self.discriminator_opt = tf.keras.optimizers.legacy.RMSprop(learning_rate=setting.learning_rate)
-        # self.decoder_opts = [tf.keras.optimizers.legacy.Adam(learning_rate=setting.learning_rate) for _ in range(setting.num_message_channel)]
 
         self.generator_loss = tf.keras.losses.MeanSquaredError()
         if wgan:
@@ -70,7 +66,7 @@ class GAN_worker():
         decoders_loss = 0
         for index in range(setting.num_message_channel):
             decoders_loss += self.decoder_loss[index](messages[index], decoded_messages[index])
-        loss += decoders_loss / setting.num_message_channel * setting.decoder_weight
+        loss += decoders_loss * setting.decoder_weight
         loss += self.discriminator_loss(tf.ones_like(discriminator_ouput_fake), discriminator_ouput_fake)
         if len(self.generator.losses) > 0 and setting.regularization_weight > 0:
             loss += tf.add_n(self.generator.losses) * setting.regularization_weight

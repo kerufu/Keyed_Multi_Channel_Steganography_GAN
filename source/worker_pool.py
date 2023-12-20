@@ -8,9 +8,6 @@ dw.dataset = dw.dataset.shuffle(dw.dataset.cardinality()//setting.shuffle_buffer
 import GAN_worker
 ganw = GAN_worker.GAN_worker(setting.GAN_key)
 
-import AE_worker
-aew = AE_worker.AE_worker(setting.AE_key)
-
 import character_mapper
 cm = character_mapper.character_mapper()
 

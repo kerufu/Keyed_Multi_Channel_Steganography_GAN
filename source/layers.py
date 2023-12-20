@@ -111,9 +111,7 @@ class HardTanh(tf.keras.layers.Layer):
 
 class HardSwish(tf.keras.layers.Layer):
     def call(self, x):
-        x = tf.where(tf.less_equal(x, -3), 0.0, x)
-        x = tf.where(tf.logical_and(tf.greater(x, -3), tf.less(x, 3)), (x*(x+3))/6, x)
-        return x
+        return x * tf.minimum(tf.maximum(x+3, 0), 6) / 6
 
 class ClipConstraint(tf.keras.constraints.Constraint):
     def __call__(self, weights):
@@ -166,15 +164,9 @@ class ImageMessageConcatenation(tf.keras.layers.Layer):
     
     def __init__(self):
         super(ImageMessageConcatenation, self).__init__()
-        if isinstance(setting.message_bit_per_pixel, int):
-            self.message_module = [
-                tf.keras.layers.Reshape((setting.image_size, setting.image_size, setting.message_bit_per_pixel))
-            ]
-        else:
-            self.message_module = [
-                CustomDense(setting.image_size*setting.image_size*(int(setting.message_bit_per_pixel)+1)),
-                tf.keras.layers.Reshape((setting.image_size, setting.image_size, (int(setting.message_bit_per_pixel)+1)))
-            ]
+        self.message_module = [
+            tf.keras.layers.Reshape((setting.image_size, setting.image_size, setting.message_bit_per_pixel))
+        ]
 
     def call(self, image, messages):
         messages = tf.concat(messages, 1)
@@ -183,9 +175,9 @@ class ImageMessageConcatenation(tf.keras.layers.Layer):
         return tf.concat([image, messages], -1)
 
 class ReflectRadding(tf.keras.layers.Layer): # O=[(W−K+P)/S]+1
-    def __init__(self, kernel_size):
+    def __init__(self):
         super(ReflectRadding, self).__init__()
-        pad = kernel_size - 1
+        pad = setting.kernal_size - 1
         self.upper_pad = pad // 2
         self.lower_pad = pad - self.upper_pad
 
@@ -194,7 +186,7 @@ class ReflectRadding(tf.keras.layers.Layer): # O=[(W−K+P)/S]+1
 
 class CustomConv2D(tf.keras.layers.Layer):
 
-    def __init__(self, num_channel, kernel_size, reflect_padding=False, scale_down_mode=0, clip_kernal=False, activation="hswish", depthwise_seperable=False):
+    def __init__(self, num_channel, batch_normalization=True, enable_regularization=True, reflect_padding=False, scale_down_mode=0, clip_kernal=False, activation="hswish", enable_dropout=False, depthwise_seperable=False):
         super(CustomConv2D, self).__init__()
 
         kernel_constraint = None
@@ -206,44 +198,52 @@ class CustomConv2D(tf.keras.layers.Layer):
         else:
             Conv2D = tf.keras.layers.Conv2D
 
+        kernel_regularizer = None
+        if enable_regularization:
+            kernel_regularizer = tf.keras.regularizers.L1L2()
+
         if reflect_padding:
             if scale_down_mode == 0:
                 self.module = [
-                    ReflectRadding(kernel_size),
-                    Conv2D(num_channel, kernel_size, kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
+                    ReflectRadding(),
+                    Conv2D(num_channel, setting.kernal_size, kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
                 ]
             elif scale_down_mode == 1:
                 self.module = [
-                    ReflectRadding(kernel_size),
-                    Conv2D(num_channel, kernel_size, strides=2, kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
+                    ReflectRadding(),
+                    Conv2D(num_channel, setting.kernal_size, strides=2, kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
                 ]
             elif scale_down_mode == 2:
                 self.module = [
-                    ReflectRadding(kernel_size),
-                    Conv2D(num_channel, kernel_size, kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
+                    ReflectRadding(),
+                    Conv2D(num_channel, setting.kernal_size, kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
                     tf.keras.layers.MaxPool2D(),
                 ]
         else:
             if scale_down_mode == 0:
                 self.module = [
-                    Conv2D(num_channel, kernel_size, padding='same', kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
+                    Conv2D(num_channel, setting.kernal_size, padding='same', kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
                 ]
             elif scale_down_mode == 1:
                 self.module = [
-                    Conv2D(num_channel, kernel_size, strides=2, padding='same', kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
+                    Conv2D(num_channel, setting.kernal_size, strides=2, padding='same', kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
                 ]
             elif scale_down_mode == 2:
                 self.module = [
-                    Conv2D(num_channel, kernel_size, padding='same', kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
+                    Conv2D(num_channel, setting.kernal_size, padding='same', kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
                     tf.keras.layers.MaxPool2D(),
                 ]
+        if batch_normalization:
+            self.module.append(tf.keras.layers.BatchNormalization())
 
-        self.module.append(tf.keras.layers.BatchNormalization())
         if activation == "hswish":
             self.module.append(HardSwish())
+        elif activation == "htanh":
+            self.module.append(HardTanh())
         else:
             self.module.append(tf.keras.layers.Activation(activation))
-        if setting.dropout_ratio:
+            
+        if enable_dropout and setting.dropout_ratio:
             self.module.append(tf.keras.layers.Dropout(setting.dropout_ratio))
 
     def call(self, x, training):
@@ -256,24 +256,53 @@ class CustomConv2D(tf.keras.layers.Layer):
 
 class CustomDense(tf.keras.layers.Layer):
 
-    def __init__(self, output_size, clip_kernal=False, activation="leaky_relu"):
+    def __init__(self, output_size, batch_normalization=True, enable_regularization=True, clip_kernal=False, activation="hswish", enable_dropout=False):
         super(CustomDense, self).__init__()
 
         kernel_constraint = None
         if clip_kernal:
             kernel_constraint = ClipConstraint()
 
+        kernel_regularizer = None
+        if enable_regularization:
+            kernel_regularizer = tf.keras.regularizers.L1L2()
+
         self.module = [
-            tf.keras.layers.Dense(output_size, kernel_regularizer=tf.keras.regularizers.L1L2(), kernel_constraint=kernel_constraint),
-            tf.keras.layers.BatchNormalization(),
-            tf.keras.layers.Activation(activation)
+            tf.keras.layers.Dense(output_size, kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
         ]
-        if setting.dropout_ratio:
+        if batch_normalization:
+            self.module.append(tf.keras.layers.BatchNormalization())
+        if activation == "hswish":
+            self.module.append(HardSwish())
+        elif activation == "htanh":
+            self.module.append(HardTanh())
+        else:
+            self.module.append(tf.keras.layers.Activation(activation))
+        if enable_dropout and setting.dropout_ratio:
             self.module.append(tf.keras.layers.Dropout(setting.dropout_ratio))
 
     def call(self, x, training):
         for layer in self.module:
             if "dropout" in layer.name or "batch_normalization" in layer.name:
+                x = layer(x, training)
+            else:
+                x = layer(x)
+        return x
+
+class CustomFlatten(tf.keras.layers.Layer):
+    def __init__(self, output_size):
+        super(CustomFlatten, self).__init__()
+        num_outpt_layers = np.ceil(np.log2(setting.image_size))
+        flatten_step = int(np.power(output_size/setting.num_conv_channel, 1/num_outpt_layers))
+        self.output_module = [
+            CustomConv2D(setting.num_conv_channel*(flatten_step**(index+1)), scale_down_mode=2, depthwise_seperable=True) for index in range(num_outpt_layers-1)
+        ]
+        self.output_module.append(CustomConv2D(output_size, batch_normalization=False, activation="linear", scale_down_mode=1), depthwise_seperable=True)
+        self.output_module.append(tf.keras.layers.Flatten())
+
+    def call(self, x, training):
+        for layer in self.output_module:
+            if "custom" in layer.name:
                 x = layer(x, training)
             else:
                 x = layer(x)

@@ -19,16 +19,14 @@ GAN_pathes = {
     "decoder": "saved_model/GAN/decoder_",
 }
 
-AE_pathes = {
-    "encoder": "saved_model/AE/encoder",
-    "decoder": "saved_model/AE/decoder",
-}
-
 sample_image = "sample_image.png"
 sample_encoded_image = "sample_encoded_image.png"
 sample_downloaded_image = "sample_downloaded_image.png"
 sample_reconstructed_image = "sample_reconstructed_image.png"
 sample_compressed_image = "sample_compressed_image.jpg"
+
+num_conv_channel = 32
+kernal_size = 3
 
 label_smoothing_ratio = 0.1
 
@@ -38,10 +36,7 @@ learning_rate = 0.0001
 gradient_clip_norm = None
 weight_decay = None
 
-dropout_ratio = 0
-regularization_weight = 0
-mse_weight = 80
-decoder_weight = 10
+num_message_channel = 4
 
 jpeg_compression_loss_weight = 0
 jpeg_compression_iteration = 20
@@ -49,16 +44,17 @@ jpeg_compression_iteration = 20
 np.random.seed(0)
 key_size = 32
 GAN_key = np.random.choice(2, size=key_size)
-AE_key = np.random.choice(2, size=key_size)
 np.random.seed(int(time.time()))
-
-AE_feature_size = 64
-
-num_message_channel = 4
 
 message_bit_per_pixel = 1
 total_bit_size_per_channel = (image_size * image_size * message_bit_per_pixel) // num_message_channel
 total_bit_size = total_bit_size_per_channel * num_message_channel
+
+dropout_ratio = 0
+regularization_weight = 0
+mse_weight = 80
+decoder_weight = 10
+decoder_weight = decoder_weight * message_bit_per_pixel / num_message_channel
 
 coding_window_size = 8
 
