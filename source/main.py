@@ -1,10 +1,14 @@
 import os
 os.chdir("..")
 
-import dataset_worker
-import GAN_worker
+import tensorflow as tf
 
-dw = dataset_worker.dataset_worker()
-ganw = GAN_worker.GAN_worker()
-# ganw.train(50000, dw.dataset)
-ganw.test(dw.dataset)
+import worker_pool
+
+# worker_pool.ganw.train(50000)
+worker_pool.ganw.evaluate(coding_mode=0)
+# worker_pool.ganw.plot()
+
+# worker_pool.bw.botnet_simulation(character_mapping=False)
+# worker_pool.bw.update_twitter_profile_image()
+# worker_pool.bw.decode_twitter_profile_image()

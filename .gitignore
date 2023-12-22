@@ -1,6 +1,9 @@
 dataset
 processed_dataset
 saved_model
+env
 
-sample_decoded_image.jpg
-sample_image.jpg
+*.png
+*.jpg
+*.pickle
+.DS_Store
