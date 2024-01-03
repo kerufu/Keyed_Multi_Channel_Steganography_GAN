@@ -52,9 +52,12 @@ total_bit_size = total_bit_size_per_channel * num_message_channel
 
 dropout_ratio = 0
 regularization_weight = 0
-mse_weight = 80
+discriminator_weight = message_bit_per_pixel
+discriminator_weight /= discriminator_weight
+mse_weight = 90
+mse_weight *= np.log2(message_bit_per_pixel*2) / discriminator_weight
 decoder_weight = 10
-decoder_weight = decoder_weight * message_bit_per_pixel / num_message_channel
+decoder_weight *= np.exp2(message_bit_per_pixel-1) / num_message_channel / discriminator_weight
 
 coding_window_size = 8
 

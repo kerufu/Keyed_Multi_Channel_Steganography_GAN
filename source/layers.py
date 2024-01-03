@@ -121,28 +121,18 @@ class ClipConstraint(tf.keras.constraints.Constraint):
         return {'kernal_clip_value': setting.kernal_clip_value}
 
 class EncrypteMessage(tf.keras.layers.Layer):
-    def __init__(self, key, xor=True):
+    def __init__(self, key):
         super(EncrypteMessage, self).__init__()
-        self.xor = xor
 
         self.key = tf.repeat(key, repeats=setting.image_size//setting.key_size, axis=0)
         self.key = tf.repeat([self.key], repeats=setting.image_size//setting.num_message_channel, axis=0)
         self.key = tf.repeat([self.key], repeats=setting.message_bit_per_pixel, axis=0)
         self.key = tf.reshape(self.key, [-1])
 
-        if not self.xor:
-            self.key = tf.repeat([self.key], repeats=setting.batch_size, axis=0)
-            self.key = tf.cast(self.key, tf.float32) - 0.5
-
     def call(self, message):
-        if self.xor:
-            message = tf.bitwise.bitwise_xor(message, self.key)
-
+        message = tf.bitwise.bitwise_xor(message, self.key)
         message = tf.cast(message, tf.float32)
         message = message * 2 - 1
-
-        if not self.xor:
-            message = message + self.key
 
         return message
 
@@ -292,12 +282,12 @@ class CustomDense(tf.keras.layers.Layer):
 class CustomFlatten(tf.keras.layers.Layer):
     def __init__(self, output_size):
         super(CustomFlatten, self).__init__()
-        num_outpt_layers = np.ceil(np.log2(setting.image_size))
-        flatten_step = int(np.power(output_size/setting.num_conv_channel, 1/num_outpt_layers))
+        num_flatten_layers = int(np.ceil(np.log2(setting.image_size)))
+        flatten_step = int(np.power(output_size/setting.num_conv_channel, 1/num_flatten_layers))
         self.output_module = [
-            CustomConv2D(setting.num_conv_channel*(flatten_step**(index+1)), scale_down_mode=2, depthwise_seperable=True) for index in range(num_outpt_layers-1)
+            CustomConv2D(setting.num_conv_channel*(flatten_step**(index+1)), scale_down_mode=2, depthwise_seperable=True) for index in range(num_flatten_layers-1)
         ]
-        self.output_module.append(CustomConv2D(output_size, batch_normalization=False, activation="linear", scale_down_mode=1), depthwise_seperable=True)
+        self.output_module.append(CustomConv2D(output_size, batch_normalization=False, activation="linear", scale_down_mode=1, depthwise_seperable=True))
         self.output_module.append(tf.keras.layers.Flatten())
 
     def call(self, x, training):

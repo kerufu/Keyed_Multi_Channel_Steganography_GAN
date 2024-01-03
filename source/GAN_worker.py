@@ -4,6 +4,7 @@ import tensorflow as tf
 import numpy as np
 from termcolor import cprint
 import cv2
+import image_similarity_measures.quality_metrics as image_metrics
 
 import GAN_definition
 import setting
@@ -68,7 +69,7 @@ class GAN_worker():
         for index in range(setting.num_message_channel):
             decoders_loss += self.decoder_loss[index](messages[index], decoded_messages[index])
         loss += decoders_loss * setting.decoder_weight
-        loss += self.discriminator_loss(tf.ones_like(discriminator_ouput_fake), discriminator_ouput_fake)
+        loss += self.discriminator_loss(tf.ones_like(discriminator_ouput_fake), discriminator_ouput_fake) * setting.discriminator_weight
         if len(self.generator.losses) > 0 and setting.regularization_weight > 0:
             loss += tf.add_n(self.generator.losses) * setting.regularization_weight
 
@@ -270,6 +271,23 @@ class GAN_worker():
         cv2.imwrite(setting.sample_encoded_image, np.array((encoded_image[0]+1)*127.5))
 
         print("Image Reconstruction Loss: " + str(self.generator_metric.result().numpy()))
+
+        def get_image_metric(metric, set_max_p=False):
+            result = 0
+            for index in range(setting.batch_size):
+                if set_max_p:
+                    result += metric(np.array(batch[index]), np.array(encoded_image[index]), max_p=2)
+                else:
+                    result += metric(np.array(batch[index]), np.array(encoded_image[index]))
+            return result / setting.batch_size
+
+        print("Image SSIM: " + str(get_image_metric(image_metrics.ssim, set_max_p=True)))
+        print("Image PSNR: " + str(get_image_metric(image_metrics.psnr, set_max_p=True)))
+        print("Image FSIM: " + str(get_image_metric(image_metrics.fsim)))
+        print("Image SRE: " + str(get_image_metric(image_metrics.sre)))
+        print("Image SAM: " + str(get_image_metric(image_metrics.sam)))
+        print("Image UIQ: " + str(get_image_metric(image_metrics.uiq)))
+
         if setting.jpeg_compression_loss_weight:
             print("Image Compression Loss: " + str(self.compression_metric.result().numpy()))
         print("Discriminator Accuracy: " + str(self.discriminator_metric.result().numpy()))
