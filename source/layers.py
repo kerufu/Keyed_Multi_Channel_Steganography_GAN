@@ -136,20 +136,6 @@ class EncrypteMessage(tf.keras.layers.Layer):
 
         return message
 
-class MaskFeature(tf.keras.layers.Layer):
-    def __init__(self, mask):
-        super(MaskFeature, self).__init__()
-        self.mask = tf.repeat(mask, repeats=setting.image_size//setting.key_size)
-        self.mask = tf.repeat([self.mask], repeats=setting.image_size)
-        self.mask = tf.repeat([self.mask], repeats=setting.batch_size, axis=0)
-        self.mask = tf.convert_to_tensor(mask, dtype=tf.float32)
-        self.mask -= 0.5
-
-    def call(self, feature):
-        feature = feature * 2 - 1
-        feature = self.mask + feature
-        return feature
-
 class ImageMessageConcatenation(tf.keras.layers.Layer):
     
     def __init__(self):
@@ -283,11 +269,11 @@ class CustomFlatten(tf.keras.layers.Layer):
     def __init__(self, output_size):
         super(CustomFlatten, self).__init__()
         num_flatten_layers = int(np.ceil(np.log2(setting.image_size)))
-        flatten_step = int(np.power(output_size/setting.num_conv_channel, 1/num_flatten_layers))
+        flatten_step = np.power(output_size/setting.num_conv_channel, 1/num_flatten_layers)
         self.output_module = [
-            CustomConv2D(setting.num_conv_channel*(flatten_step**(index+1)), scale_down_mode=2, depthwise_seperable=True) for index in range(num_flatten_layers-1)
+            CustomConv2D(int(setting.num_conv_channel*(flatten_step**(index+1))), scale_down_mode=1) for index in range(num_flatten_layers-1)
         ]
-        self.output_module.append(CustomConv2D(output_size, batch_normalization=False, activation="linear", scale_down_mode=1, depthwise_seperable=True))
+        self.output_module.append(CustomConv2D(output_size, batch_normalization=False, activation="linear", scale_down_mode=1))
         self.output_module.append(tf.keras.layers.Flatten())
 
     def call(self, x, training):

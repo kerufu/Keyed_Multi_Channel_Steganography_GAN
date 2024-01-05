@@ -39,7 +39,7 @@ weight_decay = None
 num_message_channel = 4
 
 jpeg_compression_loss_weight = 0
-jpeg_compression_iteration = 20
+jpeg_compression_iteration = 5
 
 np.random.seed(0)
 key_size = 32
@@ -52,12 +52,11 @@ total_bit_size = total_bit_size_per_channel * num_message_channel
 
 dropout_ratio = 0
 regularization_weight = 0
-discriminator_weight = message_bit_per_pixel
-discriminator_weight /= discriminator_weight
+discriminator_weight = 1
 mse_weight = 90
-mse_weight *= np.log2(message_bit_per_pixel*2) / discriminator_weight
+mse_weight *= np.log2(message_bit_per_pixel*2) / message_bit_per_pixel
 decoder_weight = 10
-decoder_weight *= np.exp2(message_bit_per_pixel-1) / num_message_channel / discriminator_weight
+decoder_weight *= np.exp2(message_bit_per_pixel-1) / num_message_channel / message_bit_per_pixel
 
 coding_window_size = 8
 
