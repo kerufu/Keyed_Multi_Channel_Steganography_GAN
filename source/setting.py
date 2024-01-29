@@ -17,6 +17,7 @@ GAN_pathes = {
     "generator": "saved_model/GAN/generator",
     "discriminator": "saved_model/GAN/discriminator",
     "decoder": "saved_model/GAN/decoder_",
+    "authenticator": "saved_model/GAN/authenticator",
 }
 
 sample_image = "sample_image.png"
@@ -57,6 +58,7 @@ mse_weight = 90
 mse_weight *= np.log2(message_bit_per_pixel*2) / message_bit_per_pixel
 decoder_weight = 10
 decoder_weight *= np.exp2(message_bit_per_pixel-1) / num_message_channel / message_bit_per_pixel
+authenticator_weight = 1e-4 / message_bit_per_pixel
 
 coding_window_size = 8
 
@@ -90,4 +92,3 @@ twitter_credential = {
     "access_token": "1721801499179974656-bewsgdBWw7t3DLXF3MrNCpUnsjJUGW",
     "access_token_secret": "a4R421fvuYUEpxouH9pZVNsIbXagHTTB0rpEAzgmvGUlj"
 }
-

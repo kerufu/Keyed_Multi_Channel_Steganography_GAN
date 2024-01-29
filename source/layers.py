@@ -120,34 +120,34 @@ class ClipConstraint(tf.keras.constraints.Constraint):
     def get_config(self):
         return {'kernal_clip_value': setting.kernal_clip_value}
 
-class EncrypteMessage(tf.keras.layers.Layer):
+class EncryptionConcatenation(tf.keras.layers.Layer):
     def __init__(self, key):
-        super(EncrypteMessage, self).__init__()
+        super(EncryptionConcatenation, self).__init__()
+        self.key = self.expand_key(key)
+        self.message_reshape = tf.keras.layers.Reshape((setting.image_size, setting.image_size, setting.message_bit_per_pixel))
 
-        self.key = tf.repeat(key, repeats=setting.image_size//setting.key_size, axis=0)
-        self.key = tf.repeat([self.key], repeats=setting.image_size//setting.num_message_channel, axis=0)
-        self.key = tf.repeat([self.key], repeats=setting.message_bit_per_pixel, axis=0)
-        self.key = tf.reshape(self.key, [-1])
+    def expand_key(self, key):
+        key = tf.repeat(key, repeats=setting.image_size//setting.key_size, axis=0)
+        key = tf.repeat([key], repeats=setting.image_size, axis=0)
+        key = tf.repeat([key], repeats=setting.message_bit_per_pixel, axis=0)
+        key = tf.repeat([key], repeats=setting.batch_size, axis=0)
+        key = tf.transpose(key, [0, 2, 3, 1])
+        return key
 
-    def call(self, message):
-        message = tf.bitwise.bitwise_xor(message, self.key)
-        message = tf.cast(message, tf.float32)
-        message = message * 2 - 1
-
-        return message
-
-class ImageMessageConcatenation(tf.keras.layers.Layer):
-    
-    def __init__(self):
-        super(ImageMessageConcatenation, self).__init__()
-        self.message_module = [
-            tf.keras.layers.Reshape((setting.image_size, setting.image_size, setting.message_bit_per_pixel))
-        ]
-
-    def call(self, image, messages):
+    def call(self, image, messages, random_key):
+        if random_key:
+            key = tf.random.categorical(tf.math.log([[0.5, 0.5]]), setting.key_size)[0]
+            key = self.expand_key(key)
+        else:
+            key = self.key
+        
         messages = tf.concat(messages, 1)
-        for mm in self.message_module:
-            messages = mm(messages)
+        messages = self.message_reshape(messages)
+        messages = tf.bitwise.bitwise_xor(messages, key)
+        messages = tf.concat([messages, key], -1)
+        messages = tf.cast(messages, tf.float32)
+        messages = messages * 2 - 1
+
         return tf.concat([image, messages], -1)
 
 class ReflectRadding(tf.keras.layers.Layer): # O=[(W−K+P)/S]+1

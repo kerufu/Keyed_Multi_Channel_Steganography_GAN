@@ -3,3 +3,4 @@ numpy
 tensorflow
 tweepy
 wget
+image-similarity-measures

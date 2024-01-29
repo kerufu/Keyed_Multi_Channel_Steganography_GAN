@@ -12,28 +12,26 @@ class generator(tf.keras.Model):
         self.input_module = [
             layers.CustomConv2D(setting.num_conv_channel, reflect_padding=True)
         ]
-        self.xor_layer = layers.EncrypteMessage(key)
-        self.concat_layer = layers.ImageMessageConcatenation()
+        self.ec_layer = layers.EncryptionConcatenation(key)
         self.output_module = [
             layers.CustomConv2D(setting.num_conv_channel, reflect_padding=True),
             layers.CustomConv2D(setting.num_conv_channel, reflect_padding=True),
             layers.CustomConv2D(3, batch_normalization=False, reflect_padding=True, activation="htanh")
         ]
 
-    def call(self, image, messages, enable_hamming=False, training=False):
+    def call(self, image, messages, random_key=False, enable_hamming=False, training=False):
 
         input_feature = tf.identity(image)
         for im in self.input_module:
             input_feature = im(image, training)
 
         messages = messages.copy()
-        for index in range(setting.num_message_channel): # for isolation between recievers
-            if enable_hamming:
+        if enable_hamming:
+            for index in range(setting.num_message_channel): # for isolation between recievers
                 messages[index] = self.hamming_layer(messages[index])
-            messages[index] = self.xor_layer(messages[index])
 
         middle_features = []
-        middle_features.append(self.concat_layer(input_feature, messages)) # a, M
+        middle_features.append(self.ec_layer(input_feature, messages, random_key)) # a, M
         middle_features.append(self.output_module[0](middle_features[-1], training)) # a, M, b
         middle_features.append(self.output_module[1](tf.concat(middle_features, -1), training)) # a, M, b, c
 
@@ -91,7 +89,6 @@ class decoder(tf.keras.Model):
                 layers.CustomDense(setting.total_bit_size_per_channel, batch_normalization=False, activation="linear")
             ]
         
-
         self.hamming_layer = layers.HammingCode(decode_mode=True)
 
     def call(self, x, enable_hamming=False, training=False):
