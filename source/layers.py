@@ -138,6 +138,8 @@ class EncryptionConcatenation(tf.keras.layers.Layer):
         if random_key:
             key = tf.random.categorical(tf.math.log([[0.5, 0.5]]), setting.key_size)[0]
             key = self.expand_key(key)
+            if tf.math.reduce_all(tf.math.equal(key, self.key)):
+                key = tf.bitwise.bitwise_xor(key, tf.ones_like(key))
         else:
             key = self.key
         

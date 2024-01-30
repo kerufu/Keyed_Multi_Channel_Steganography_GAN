@@ -54,11 +54,13 @@ total_bit_size = total_bit_size_per_channel * num_message_channel
 dropout_ratio = 0
 regularization_weight = 0
 discriminator_weight = 1
-mse_weight = 90
-mse_weight *= np.log2(message_bit_per_pixel*2) / message_bit_per_pixel
-decoder_weight = 20
+mse_weight_valid = 90
+mse_weight_valid *= np.log2(message_bit_per_pixel*2) / message_bit_per_pixel
+mse_weight_invalid = mse_weight_valid / 10
+mse_weight_valid -= mse_weight_invalid
+decoder_weight = 10
 decoder_weight *= np.exp2(message_bit_per_pixel-1) / num_message_channel / message_bit_per_pixel
-authenticator_weight = 1e-7 / message_bit_per_pixel
+authenticator_weight = 1e-8 / message_bit_per_pixel
 
 coding_window_size = 8
 

@@ -12,7 +12,7 @@ import layers
 import worker_pool
 
 class GAN_worker():
-    def __init__(self, key, generator_iteration=1, discriminator_iteration=1, decoder_iteration=1, authenticator_iteration=10, wgan=True) -> None:
+    def __init__(self, key, generator_iteration=1, discriminator_iteration=5, decoder_iteration=1, authenticator_iteration=5, wgan=True) -> None:
         self.generator_iteration = generator_iteration
         self.discriminator_iteration = discriminator_iteration
         self.decoder_iteration = decoder_iteration
@@ -70,8 +70,8 @@ class GAN_worker():
         return compressed_image
 
     def get_generator_loss(self, input_image, output_image_valid, output_image_invalid, messages, decoded_messages, discriminator_ouput_fake, authenticator_output_valid, authenticator_output_invalid):
-        loss = self.generator_loss(input_image, output_image_valid) * setting.mse_weight
-        loss += self.generator_loss(input_image, output_image_invalid) * setting.mse_weight
+        loss = self.generator_loss(input_image, output_image_valid) * setting.mse_weight_valid
+        loss += self.generator_loss(input_image, output_image_invalid) * setting.mse_weight_invalid
         decoders_loss = 0
         for index in range(setting.num_message_channel):
             decoders_loss += self.decoder_loss[index](messages[index], decoded_messages[index])
@@ -114,7 +114,7 @@ class GAN_worker():
             with tf.GradientTape() as generator_tape:
                 
                 output_image_valid = self.generator(batch, messages, training=True)
-                output_image_invalid = self.generator(batch, messages, random_key=True)
+                output_image_invalid = self.generator(batch, messages, training=True, random_key=True)
 
                 decoded_messages = []
                 for index in range(setting.num_message_channel):

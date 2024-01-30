@@ -115,7 +115,9 @@ class authenticator(tf.keras.Model):
     def __init__(self):
         super(authenticator, self).__init__()
         self.module = [
-            layers.CustomConv2D(setting.num_conv_channel),
+            layers.CustomConv2D(setting.num_conv_channel, scale_down_mode=1),
+            layers.CustomConv2D(setting.num_conv_channel, scale_down_mode=1),
+            layers.CustomConv2D(setting.num_conv_channel, scale_down_mode=1),
             layers.CustomConv2D(1, batch_normalization=False, scale_down_mode=1, activation="linear")
         ]
 
