@@ -69,8 +69,9 @@ class GAN_worker():
                 compressed_image[index, :, :, :] = cv2.imdecode((ci), 1) / 127.5 - 1
         return compressed_image
 
-    def get_generator_loss(self, input_image, output_image, messages, decoded_messages, discriminator_ouput_fake, authenticator_output_valid, authenticator_output_invalid):
-        loss = self.generator_loss(input_image, output_image) * setting.mse_weight
+    def get_generator_loss(self, input_image, output_image_valid, output_image_invalid, messages, decoded_messages, discriminator_ouput_fake, authenticator_output_valid, authenticator_output_invalid):
+        loss = self.generator_loss(input_image, output_image_valid) * setting.mse_weight
+        loss += self.generator_loss(input_image, output_image_invalid) * setting.mse_weight
         decoders_loss = 0
         for index in range(setting.num_message_channel):
             decoders_loss += self.decoder_loss[index](messages[index], decoded_messages[index])
@@ -82,9 +83,9 @@ class GAN_worker():
         loss += self.authenticator_loss(tf.zeros_like(authenticator_output_invalid), authenticator_output_invalid) * setting.authenticator_weight
 
         if setting.jpeg_compression_loss_weight:
-            compressed_image = self.compress_image(output_image)
-            loss += self.compression_loss(output_image, compressed_image) * setting.jpeg_compression_loss_weight
-            self.compression_metric.update_state(output_image, compressed_image)
+            compressed_image = self.compress_image(output_image_valid)
+            loss += self.compression_loss(output_image_valid, compressed_image) * setting.jpeg_compression_loss_weight
+            self.compression_metric.update_state(output_image_valid, compressed_image)
 
         return loss
     
@@ -113,18 +114,21 @@ class GAN_worker():
             with tf.GradientTape() as generator_tape:
                 
                 output_image_valid = self.generator(batch, messages, training=True)
-                output_image_invalid = self.generator(batch, messages, training=True, random_key=True)
+                output_image_invalid = self.generator(batch, messages, random_key=True)
 
                 decoded_messages = []
                 for index in range(setting.num_message_channel):
                     decoded_messages.append(self.decoders[index](output_image_valid))
                 
-                discriminator_ouput_fake = self.discriminator(output_image_valid)
+                discriminator_ouput_fake = self.discriminator(tf.concat([output_image_valid, output_image_invalid], axis=0))
 
-                authenticator_output_valid = self.discriminator(output_image_valid)
-                authenticator_output_invalid = self.discriminator(output_image_invalid)
+                authenticator_output_valid = self.authenticator(output_image_valid)
+                authenticator_output_invalid = self.authenticator(output_image_invalid)
 
-                generator_loss = self.get_generator_loss(batch, output_image_valid, messages, decoded_messages, discriminator_ouput_fake, authenticator_output_valid, authenticator_output_invalid)
+                # tf.print(authenticator_output_valid)
+                # tf.print(authenticator_output_invalid)
+
+                generator_loss = self.get_generator_loss(batch, output_image_valid, output_image_invalid, messages, decoded_messages, discriminator_ouput_fake, authenticator_output_valid, authenticator_output_invalid)
             
             generator_gradient = generator_tape.gradient(generator_loss, self.generator.trainable_variables)
             self.generator_opt.apply_gradients(zip(generator_gradient, self.generator.trainable_variables))
@@ -147,8 +151,9 @@ class GAN_worker():
         self.discriminator_opt.apply_gradients(zip(discriminator_gradient, self.discriminator.trainable_variables))
 
         with tf.GradientTape() as discriminator_tape_fake:
-            output_image = self.generator(batch, messages)
-            discriminator_ouput_fake = self.discriminator(output_image, training=True)
+            output_image_valid = self.generator(batch, messages)
+            output_image_invalid = self.generator(batch, messages, random_key=True)
+            discriminator_ouput_fake = self.discriminator(tf.concat([output_image_valid, output_image_invalid], axis=0), training=True)
 
             discriminator_loss_fake = self.get_discriminator_loss(tf.zeros_like(discriminator_ouput_fake), discriminator_ouput_fake)
 
@@ -177,6 +182,9 @@ class GAN_worker():
 
             authenticator_output_valid = self.authenticator(output_image_valid, training=True)
             authenticator_output_invalid = self.authenticator(output_image_invalid, training=True)
+            
+            # tf.print(authenticator_output_valid)
+            # tf.print(authenticator_output_invalid)
 
             authenticator_loss = self.get_authenticator_loss(authenticator_output_valid, authenticator_output_invalid)
 
@@ -245,7 +253,7 @@ class GAN_worker():
             save_con1 = msg_acc_mean > msg_acc_max
             save_con2 = msg_acc_mean > msg_acc_max - 0.0001
             save_con3 = save_con2 and (auth_acc >= auth_acc_max)
-            save_con2 = save_con2 and (mse < mse_min)
+            save_con2 = save_con2 and (mse < mse_min + 0.0001)
 
             if save_con1:
                 msg_acc_max = msg_acc_mean
@@ -284,7 +292,7 @@ class GAN_worker():
             self.compression_metric.reset_state()
 
         enable_hamming = False
-        enable_character_mapping= False
+        enable_character_mapping = False
         if coding_mode == 1:
             enable_hamming = True
         elif coding_mode == 2:
@@ -330,7 +338,10 @@ class GAN_worker():
 
             authenticator_output_valid = self.authenticator(encoded_image_valid)
             authenticator_output_invalid = self.authenticator(encoded_image_invalid)
-            
+
+            # tf.print(authenticator_output_valid)
+            # tf.print(authenticator_output_invalid)
+                    
             self.generator_metric.update_state(batch, encoded_image_valid)
             if setting.jpeg_compression_loss_weight:
                 compressed_image = self.compress_image(encoded_image_valid)

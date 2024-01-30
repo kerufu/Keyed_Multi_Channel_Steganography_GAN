@@ -2,6 +2,7 @@ dataset
 processed_dataset
 saved_model
 env
+archived_model
 
 *.png
 *.jpg

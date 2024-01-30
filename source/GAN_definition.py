@@ -71,7 +71,7 @@ class discriminator(tf.keras.Model):
         return tf.keras.Model(inputs=[image_input], outputs=self.call(image_input))
     
 class decoder(tf.keras.Model):
-    def __init__(self, conv_flatten=False):
+    def __init__(self):
         super(decoder, self).__init__()
         self.input_module = [   
             layers.CustomConv2D(setting.num_conv_channel),
@@ -79,16 +79,10 @@ class decoder(tf.keras.Model):
             layers.CustomConv2D(setting.num_conv_channel),
             layers.CustomConv2D(setting.num_conv_channel)
         ]
-        if conv_flatten:
-            self.output_module = [
-                layers.CustomFlatten(setting.total_bit_size_per_channel)
-            ]
-        else:
-            self.output_module = [
-                tf.keras.layers.Flatten(),
-                layers.CustomDense(setting.total_bit_size_per_channel, batch_normalization=False, activation="linear")
-            ]
-        
+        self.output_module = [
+            tf.keras.layers.Flatten(),
+            layers.CustomDense(setting.total_bit_size_per_channel, batch_normalization=False, activation="linear")
+        ]
         self.hamming_layer = layers.HammingCode(decode_mode=True)
 
     def call(self, x, enable_hamming=False, training=False):
@@ -122,8 +116,7 @@ class authenticator(tf.keras.Model):
         super(authenticator, self).__init__()
         self.module = [
             layers.CustomConv2D(setting.num_conv_channel),
-            layers.CustomFlatten(setting.num_conv_channel),
-            layers.CustomDense(1, batch_normalization=False, activation="linear")
+            layers.CustomConv2D(1, batch_normalization=False, scale_down_mode=1, activation="linear")
         ]
 
     def call(self, x, training=False):
@@ -132,7 +125,7 @@ class authenticator(tf.keras.Model):
                 x = layer(x, training)
             else:
                 x = layer(x)
-        return x
+        return tf.reduce_mean(x, axis=[1, 2, 3])
     
     def model(self):
         image_input = tf.keras.Input(shape=(setting.image_size, setting.image_size, 3), dtype='float32', name='image_input')
