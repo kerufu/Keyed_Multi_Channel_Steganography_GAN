@@ -109,5 +109,12 @@ def xor_test():
         )
 
 # character_mapper_evaluate()
+        
 
+for batch in worker_pool.dw.dataset:
+    messages = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
+    images = worker_pool.ganw.generator(batch, messages)
+    break
 
+for i in range(len(images)):
+    cv2.imwrite("gebe/"+str(i)+".png", np.array((images[i]+1)*127.5))

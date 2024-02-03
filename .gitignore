@@ -3,6 +3,7 @@ processed_dataset
 saved_model
 env
 archived_model
+generated
 
 *.png
 *.jpg
