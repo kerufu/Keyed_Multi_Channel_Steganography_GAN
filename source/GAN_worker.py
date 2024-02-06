@@ -57,7 +57,10 @@ class GAN_worker():
         self.generator_metric = tf.keras.metrics.MeanSquaredError()
         self.discriminator_metric = tf.keras.metrics.BinaryAccuracy(threshold=0) # for convenience, handle wgan score in the same way as logit, which is not actual
         self.decoders_metric = [tf.keras.metrics.BinaryAccuracy(threshold=0) for _ in range(setting.num_message_channel)]
-        self.authenticator_metric = tf.keras.metrics.BinaryAccuracy(threshold=0)
+
+        self.authenticator_accuracy = tf.keras.metrics.BinaryAccuracy(threshold=0)
+        self.authenticator_precision = tf.keras.metrics.Precision(thresholds=0)
+        self.authenticator_recall = tf.keras.metrics.Recall(thresholds=0)
 
         self.compression_metric = tf.keras.metrics.MeanSquaredError()
 
@@ -182,17 +185,18 @@ class GAN_worker():
 
             authenticator_output_valid = self.authenticator(output_image_valid, training=True)
             authenticator_output_invalid = self.authenticator(output_image_invalid, training=True)
-            
-            # tf.print(authenticator_output_valid)
-            # tf.print(authenticator_output_invalid)
 
             authenticator_loss = self.get_authenticator_loss(authenticator_output_valid, authenticator_output_invalid)
 
         authenticator_gradient = authenticator_tape.gradient(authenticator_loss, self.authenticator.trainable_variables)
         self.authenticator_opt.apply_gradients(zip(authenticator_gradient, self.authenticator.trainable_variables))
 
-        self.authenticator_metric.update_state(tf.ones_like(authenticator_output_valid), authenticator_output_valid)
-        self.authenticator_metric.update_state(tf.zeros_like(authenticator_output_invalid), authenticator_output_invalid)
+        self.authenticator_accuracy.update_state(tf.ones_like(authenticator_output_valid), authenticator_output_valid)
+        self.authenticator_accuracy.update_state(tf.zeros_like(authenticator_output_invalid), authenticator_output_invalid)
+        self.authenticator_precision.update_state(tf.ones_like(authenticator_output_valid), authenticator_output_valid)
+        self.authenticator_precision.update_state(tf.zeros_like(authenticator_output_invalid), authenticator_output_invalid)
+        self.authenticator_recall.update_state(tf.ones_like(authenticator_output_valid), authenticator_output_valid)
+        self.authenticator_recall.update_state(tf.zeros_like(authenticator_output_invalid), authenticator_output_invalid)
 
     def train(self, epoch):
         msg_acc_max = 0
@@ -205,7 +209,11 @@ class GAN_worker():
             self.discriminator_metric.reset_state()
             for index in range(setting.num_message_channel):
                 self.decoders_metric[index].reset_state()
-            self.authenticator_metric.reset_state()
+
+            self.authenticator_accuracy.reset_state()
+            self.authenticator_precision.reset_state()
+            self.authenticator_recall.reset_state()
+
             if setting.jpeg_compression_loss_weight:
                 self.compression_metric.reset_state()
             
@@ -243,10 +251,17 @@ class GAN_worker():
                 msg_acc_list.append(msg_acc)
                 print("Message " + str(index+1) + " Reconstruction Accuracy: " + str(msg_acc))
             msg_acc_mean = np.mean(msg_acc_list)
-            auth_acc = self.authenticator_metric.result().numpy()
+
+            auth_acc = self.authenticator_accuracy.result().numpy()
+            auth_precision = self.authenticator_precision.result().numpy()
+            auth_recall = self.authenticator_recall.result().numpy()
+            auth_f1_score = 2 * (auth_precision * auth_recall) / (auth_precision + auth_recall)
 
             print("Message Reconstruction Average Accuracy: " + str(msg_acc_mean))
             print("Authenticator Accuracy: " + str(auth_acc))
+            print("Authenticator Precision: " + str(auth_precision))
+            print("Authenticator Recall: " + str(auth_recall))
+            print("Authenticator F1 Score: " + str(auth_f1_score))
             print("Sample Messages: " + str(np.array(messages[0][0])[:10]))
             print("Sample Decoded Messages: " + str(np.array(decoded_messages[0][0])[:10]))
 
@@ -287,7 +302,9 @@ class GAN_worker():
         self.discriminator_metric.reset_state()
         for index in range(setting.num_message_channel):
             self.decoders_metric[index].reset_state()
-        self.authenticator_metric.reset_state()
+        self.authenticator_accuracy.reset_state()
+        self.authenticator_precision.reset_state()
+        self.authenticator_recall.reset_state()
         if setting.jpeg_compression_loss_weight:
             self.compression_metric.reset_state()
 
@@ -350,8 +367,12 @@ class GAN_worker():
             self.discriminator_metric.update_state(tf.ones_like(discriminator_ouput_true), discriminator_ouput_true)
             self.discriminator_metric.update_state(tf.zeros_like(discriminator_ouput_fake), discriminator_ouput_fake)
 
-            self.authenticator_metric.update_state(tf.ones_like(authenticator_output_valid), authenticator_output_valid)
-            self.authenticator_metric.update_state(tf.zeros_like(authenticator_output_invalid), authenticator_output_invalid)
+            self.authenticator_accuracy.update_state(tf.ones_like(authenticator_output_valid), authenticator_output_valid)
+            self.authenticator_accuracy.update_state(tf.zeros_like(authenticator_output_invalid), authenticator_output_invalid)
+            self.authenticator_precision.update_state(tf.ones_like(authenticator_output_valid), authenticator_output_valid)
+            self.authenticator_precision.update_state(tf.zeros_like(authenticator_output_invalid), authenticator_output_invalid)
+            self.authenticator_recall.update_state(tf.ones_like(authenticator_output_valid), authenticator_output_valid)
+            self.authenticator_recall.update_state(tf.zeros_like(authenticator_output_invalid), authenticator_output_invalid)
 
             for index in range(setting.num_message_channel):
                 self.decoders_metric[index].update_state(messages[index], decoded_messages[index])
@@ -386,10 +407,18 @@ class GAN_worker():
             acc = self.decoders_metric[index].result().numpy()
             acc_list.append(acc)
             print("Message " + str(index+1) + " Reconstruction Accuracy: " + str(acc))
-        acc_mean = np.mean(acc_list)
+        msg_acc_mean = np.mean(acc_list)
 
-        print("Message Reconstruction Average Accuracy: " + str(acc_mean))
-        print("Authenticator Accuracy: " + str(self.authenticator_metric.result().numpy()))
+        auth_acc = self.authenticator_accuracy.result().numpy()
+        auth_precision = self.authenticator_precision.result().numpy()
+        auth_recall = self.authenticator_recall.result().numpy()
+        auth_f1_score = 2 * (auth_precision * auth_recall) / (auth_precision + auth_recall)
+
+        print("Message Reconstruction Average Accuracy: " + str(msg_acc_mean))
+        print("Authenticator Accuracy: " + str(auth_acc))
+        print("Authenticator Precision: " + str(auth_precision))
+        print("Authenticator Recall: " + str(auth_recall))
+        print("Authenticator F1 Score: " + str(auth_f1_score))
         print("Sample Messages: " + str(np.array(messages[0][0])[:10]))
         print("Sample Decoded Messages: " + str(np.array(decoded_messages[0][0])[:10]))
 
