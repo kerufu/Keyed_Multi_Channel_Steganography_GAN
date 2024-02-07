@@ -4,6 +4,7 @@ saved_model
 env
 archived_model
 generated
+source/test.py
 
 *.png
 *.jpg
