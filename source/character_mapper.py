@@ -64,6 +64,14 @@ class character_mapper():
         else:
             self.reductive_generation()
 
+        avg_hamming_dist = 0
+        hamming_dist_count = 0
+        for i in range(setting.size_of_dictionary):
+            for j in range(i+1, setting.size_of_dictionary):
+                hamming_dist_count += 1
+                avg_hamming_dist += self.hamming_distance(self.mapping_table[i], self.mapping_table[j])
+        print(" Mapping Table Average Hamming Distance:", avg_hamming_dist/hamming_dist_count)
+
         mapping_table = {}
         for code_index in range(setting.size_of_dictionary):
             bits = self.int_to_bits(self.mapping_table[code_index])

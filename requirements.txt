@@ -3,4 +3,5 @@ numpy
 tensorflow
 tweepy
 wget
+matplotlib
 image-similarity-measures

@@ -33,6 +33,7 @@ class botnet_worker():
             cmd = commands[index]
             cmd = worker_pool.cm.int_to_bits(cmd)
             cmd = np.tile(cmd, setting.num_of_window_per_channel)
+            cmd = tf.cast(cmd, tf.int64)
             commands_bits.append([cmd])
 
         output = (worker_pool.ganw.generator(img, commands_bits)[0] + 1) * 127.5
