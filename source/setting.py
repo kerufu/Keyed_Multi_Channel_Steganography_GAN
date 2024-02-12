@@ -82,10 +82,16 @@ mapping_table_path = "character_mapping_table.pickle"
 
 command_set_path = "command_set.pickle"
 vulnerable_command = {
-    True: [],
-    False: []
-    }
+    True: [
+
+    ],
+    False: [
+    
+    ]
+}
 command_set_seed = 7
+command_repeat = 32
+command_pad_width = total_bit_size_per_channel - command_repeat * coding_window_size
 
 twitter_credential = {
     "bearer_key": "AAAAAAAAAAAAAAAAAAAAALSkqwEAAAAApvXQ6X3Um3R%2FLMmGCMpSmz%2BGxYc%3DoeVspNJF3SdPynckE8ORGhalGxz0bFiHUZESZsmcr5nZveaw1t",

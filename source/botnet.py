@@ -16,23 +16,16 @@ class botnet_worker():
             setting.twitter_credential["api_key"], setting.twitter_credential["api_secret"],
             setting.twitter_credential["access_token"], setting.twitter_credential["access_token_secret"]
         ), wait_on_rate_limit=True)
-        
-        # self.twitter_client = tweepy.Client(
-        #     consumer_key=setting.twitter_credential["api_key"], consumer_secret=setting.twitter_credential["api_secret"],
-        #     access_token=setting.twitter_credential["access_token"], access_token_secret=setting.twitter_credential["access_token_secret"],
-        #     wait_on_rate_limit=True
-        # )
 
     def botmaster_process(self, image_path, commands):
         img = np.array([worker_pool.dw.preprocess_image(image_path)])
-
-        print("commands: ", commands)
 
         commands_bits = []
         for index in range(setting.num_message_channel):
             cmd = commands[index]
             cmd = worker_pool.cm.int_to_bits(cmd)
-            cmd = np.tile(cmd, setting.num_of_window_per_channel)
+            cmd = np.tile(cmd, setting.command_repeat)
+            cmd = np.pad(cmd, (0, setting.command_pad_width), 'constant', constant_values=0)
             cmd = tf.cast(cmd, tf.int64)
             commands_bits.append([cmd])
 
@@ -55,17 +48,16 @@ class botnet_worker():
         cmd = tf.math.round(cmd)
         cmd = np.array(cmd)
         cmd_voting = collections.defaultdict(int)
-        for window_index in range(0, setting.total_bit_size_per_channel, setting.coding_window_size):
+        for window_index in range(0, setting.command_repeat*setting.coding_window_size, setting.coding_window_size):
             c = worker_pool.cm.bits_to_int(cmd[window_index:window_index+setting.coding_window_size])
             if character_mapping:
                 c = worker_pool.cm.int_matching(c)
             cmd_voting[c] += 1
         command = int(max(cmd_voting, key=cmd_voting.get))
-        print(command)
 
         return command
 
-    def botnet_simulation(self, character_mapping=False, simulate_step=10000):
+    def botnet_simulation(self, character_mapping=False, simulate_step=100000):
         if character_mapping:
             command_table = list(worker_pool.cm.mapping_table.keys())
         else:
@@ -85,10 +77,14 @@ class botnet_worker():
                 decoded_commands.append(self.bot_process(setting.sample_encoded_image, channel_index, character_mapping))
             for index in range(setting.num_message_channel):
                 if commands[index] != decoded_commands[index]:
-                    print("command error: ", commands[index], decoded_commands[index])
                     vul_cmd.add(commands[index])
                     command_table.remove(commands[index])
-        print("vulnerable command: ", vul_cmd)
+        vul_cmd = list(vul_cmd)
+        print("Weak command: ", vul_cmd)
+        print("Weak command number: ", len(vul_cmd))
+        print("Strong command: ", command_table)
+        print("Strong command number: ", len(command_table))
+
 
     def update_twitter_profile_image(self, character_mapping=False):
         command_table = list(range(2**setting.coding_window_size))
