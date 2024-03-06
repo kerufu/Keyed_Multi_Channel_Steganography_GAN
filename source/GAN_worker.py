@@ -217,17 +217,20 @@ class GAN_worker():
             if setting.jpeg_compression_loss_weight:
                 self.compression_metric.reset_state()
             
-            for batch in worker_pool.dw.dataset:
-                for _ in range(self.discriminator_iteration):
+            for _ in range(self.discriminator_iteration):
+                for batch in worker_pool.dw.dataset:
                     messages = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
                     self.train_discriminator(batch, messages)
-                for _ in range(self.generator_iteration):
+            for _ in range(self.generator_iteration):
+                for batch in worker_pool.dw.dataset:
                     messages = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
                     self.train_generator(batch, messages)
-                for _ in range(self.decoder_iteration):
+            for _ in range(self.decoder_iteration):
+                for batch in worker_pool.dw.dataset:
                     messages = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
                     self.train_decoder(batch, messages)
-                for _ in range(self.authenticator_iteration):
+            for _ in range(self.authenticator_iteration):
+                for batch in worker_pool.dw.dataset:
                     messages = [np.random.choice(2, (setting.batch_size, setting.total_bit_size_per_channel)) for _ in range(setting.num_message_channel)]
                     self.train_authenticator(batch, messages)
 
