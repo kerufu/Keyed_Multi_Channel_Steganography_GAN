@@ -3,6 +3,7 @@ import pickle
 
 import setting
 
+
 class character_mapper():
     def __init__(self) -> None:
 
@@ -15,13 +16,13 @@ class character_mapper():
 
     def hamming_distance(self, n1, n2):
         return bin(np.bitwise_xor(np.uint64(n1), np.uint64(n2))).count("1")
-    
+
     def distance_mean_std(self, index):
         distance = []
         for ci in self.mapping_table:
             distance.append(self.hamming_table[ci][index])
         return np.mean(distance), np.std(distance)
-    
+
     def selective_generation(self):
         self.mapping_table = [setting.command_set_seed]
         while len(self.mapping_table) < setting.size_of_dictionary:
@@ -51,9 +52,10 @@ class character_mapper():
             self.hamming_table[min_index, :] = 0
             self.hamming_table[:, min_index] = 0
             self.mapping_table.remove(min_index)
-    
+
     def compute_mapping_table(self, selective=True):
-        self.hamming_table = np.zeros((setting.code_space_size, setting.code_space_size), dtype=int)
+        self.hamming_table = np.zeros(
+            (setting.code_space_size, setting.code_space_size), dtype=int)
         for i in range(setting.code_space_size):
             for j in range(i+1, setting.code_space_size):
                 self.hamming_table[i, j] = self.hamming_distance(i, j)
@@ -69,27 +71,30 @@ class character_mapper():
         for i in range(setting.size_of_dictionary):
             for j in range(i+1, setting.size_of_dictionary):
                 hamming_dist_count += 1
-                avg_hamming_dist += self.hamming_distance(self.mapping_table[i], self.mapping_table[j])
-        print(" Mapping Table Average Hamming Distance:", avg_hamming_dist/hamming_dist_count)
+                avg_hamming_dist += self.hamming_distance(
+                    self.mapping_table[i], self.mapping_table[j])
+        print(" Mapping Table Average Hamming Distance:",
+              avg_hamming_dist/hamming_dist_count)
 
         mapping_table = {}
         for code_index in range(setting.size_of_dictionary):
             bits = self.int_to_bits(self.mapping_table[code_index])
             mapping_table[self.mapping_table[code_index]] = bits
         self.mapping_table = mapping_table
-        
+
         with open(setting.mapping_table_path, 'wb') as fp:
-            pickle.dump(self.mapping_table, fp, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(self.mapping_table, fp,
+                        protocol=pickle.HIGHEST_PROTOCOL)
 
     def bits_to_int(self, bits):
         bits_int = 0
         for i, j in enumerate(bits[::-1]):
             bits_int += np.left_shift(np.uint64(j), np.uint64(i))
         return bits_int
-    
+
     def int_to_bits(self, integer):
         bits = np.binary_repr(integer, width=setting.coding_window_size)
-        bits = np.fromstring(bits,'u1') - ord('0')
+        bits = np.fromstring(bits, 'u1') - ord('0')
         return bits
 
     def bits_matching(self, bits):
@@ -102,7 +107,7 @@ class character_mapper():
                 min_dis = dis
                 min_code = code_int
         return self.mapping_table[min_code]
-    
+
     def int_matching(self, ints):
         min_dis = np.inf
         min_code = 0
