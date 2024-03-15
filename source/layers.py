@@ -172,9 +172,9 @@ class EncryptionConcatenation(tf.keras.layers.Layer):
 
 
 class ReflectRadding(tf.keras.layers.Layer):  # O=[(W−K+P)/S]+1
-    def __init__(self):
+    def __init__(self, kernal_size=setting.kernal_size):
         super(ReflectRadding, self).__init__()
-        pad = setting.kernal_size - 1
+        pad = kernal_size - 1
         self.upper_pad = pad // 2
         self.lower_pad = pad - self.upper_pad
 
@@ -184,7 +184,7 @@ class ReflectRadding(tf.keras.layers.Layer):  # O=[(W−K+P)/S]+1
 
 class CustomConv2D(tf.keras.layers.Layer):
 
-    def __init__(self, num_channel, batch_normalization=True, enable_regularization=True, reflect_padding=False, scale_down_mode=0, clip_kernal=False, activation="hswish", enable_dropout=False, depthwise_seperable=False):
+    def __init__(self, num_channel, kernal_size=setting.kernal_size, batch_normalization=True, enable_regularization=True, reflect_padding=False, scale_down_mode=0, clip_kernal=False, activation="hswish", enable_dropout=False, depthwise_seperable=False):
         super(CustomConv2D, self).__init__()
 
         kernel_constraint = None
@@ -203,37 +203,37 @@ class CustomConv2D(tf.keras.layers.Layer):
         if reflect_padding:
             if scale_down_mode == 0:
                 self.module = [
-                    ReflectRadding(),
-                    Conv2D(num_channel, setting.kernal_size,
+                    ReflectRadding(kernal_size),
+                    Conv2D(num_channel, kernal_size,
                            kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
                 ]
             elif scale_down_mode == 1:
                 self.module = [
-                    ReflectRadding(),
-                    Conv2D(num_channel, setting.kernal_size, strides=2,
+                    ReflectRadding(kernal_size),
+                    Conv2D(num_channel, kernal_size, strides=2,
                            kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
                 ]
             elif scale_down_mode == 2:
                 self.module = [
-                    ReflectRadding(),
-                    Conv2D(num_channel, setting.kernal_size,
+                    ReflectRadding(kernal_size),
+                    Conv2D(num_channel, kernal_size,
                            kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
                     tf.keras.layers.MaxPool2D(),
                 ]
         else:
             if scale_down_mode == 0:
                 self.module = [
-                    Conv2D(num_channel, setting.kernal_size, padding='same',
+                    Conv2D(num_channel, kernal_size, padding='same',
                            kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
                 ]
             elif scale_down_mode == 1:
                 self.module = [
-                    Conv2D(num_channel, setting.kernal_size, strides=2, padding='same',
+                    Conv2D(num_channel, kernal_size, strides=2, padding='same',
                            kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
                 ]
             elif scale_down_mode == 2:
                 self.module = [
-                    Conv2D(num_channel, setting.kernal_size, padding='same',
+                    Conv2D(num_channel, kernal_size, padding='same',
                            kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
                     tf.keras.layers.MaxPool2D(),
                 ]
@@ -319,7 +319,7 @@ class CustomFlatten(tf.keras.layers.Layer):
 
 
 class InceptionLayer(tf.keras.layers.Layer):
-    def __init__(self, num_channel, num_kernal, batch_normalization=True, enable_regularization=True,
+    def __init__(self, num_channel, num_kernal=3, batch_normalization=True, enable_regularization=True,
                  reflect_padding=False, scale_down_mode=0, clip_kernal=False, activation="hswish",
                  enable_dropout=False, depthwise_seperable=False):
         super(InceptionLayer, self).__init__()
