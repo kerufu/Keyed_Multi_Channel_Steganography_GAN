@@ -331,7 +331,7 @@ class InceptionLayer(tf.keras.layers.Layer):
             self.conv2d_cluster = [CustomConv2D(num_channel//num_kernal, setting.kernal_size, batch_normalization, enable_regularization,
                                                 reflect_padding, scale_down_mode, clip_kernal, activation, enable_dropout, depthwise_seperable)]
         for k in range(1, num_kernal):
-            self.conv2d_cluster.append(CustomConv2D(num_channel//num_kernal, setting.kernal_size+k*2, batch_normalization, enable_regularization,
+            self.conv2d_cluster.append(CustomConv2D(num_channel//num_kernal, setting.kernal_size+k, batch_normalization, enable_regularization,
                                                     reflect_padding, scale_down_mode, clip_kernal, activation,
                                                     enable_dropout, depthwise_seperable))
 

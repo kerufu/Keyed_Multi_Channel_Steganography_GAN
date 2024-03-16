@@ -11,13 +11,13 @@ class generator(tf.keras.Model):
         self.hamming_layer = layers.HammingCode()
         self.clip_residual = clip_residual
         self.input_module = [
-            layers.InceptionLayer(setting.num_conv_channel, reflect_padding=True)
+            layers.CustomConv2D(setting.num_conv_channel, reflect_padding=True)
         ]
         self.ec_layer = layers.EncryptionConcatenation(key)
         self.output_module = [
-            layers.InceptionLayer(setting.num_conv_channel,
+            layers.CustomConv2D(setting.num_conv_channel,
                                 reflect_padding=True),
-            layers.InceptionLayer(setting.num_conv_channel,
+            layers.CustomConv2D(setting.num_conv_channel,
                                 reflect_padding=True),
             layers.CustomConv2D(3, batch_normalization=False,
                                 reflect_padding=True, activation="htanh")
@@ -64,9 +64,9 @@ class discriminator(tf.keras.Model):
     def __init__(self):
         super(discriminator, self).__init__()
         self.module = [
-            layers.InceptionLayer(setting.num_conv_channel, clip_kernal=True),
-            layers.InceptionLayer(setting.num_conv_channel, clip_kernal=True),
-            layers.InceptionLayer(setting.num_conv_channel, clip_kernal=True),
+            layers.CustomConv2D(setting.num_conv_channel, clip_kernal=True),
+            layers.CustomConv2D(setting.num_conv_channel, clip_kernal=True),
+            layers.CustomConv2D(setting.num_conv_channel, clip_kernal=True),
             layers.CustomConv2D(1, batch_normalization=False,
                                 scale_down_mode=1, clip_kernal=True, activation="linear")
         ]
@@ -89,9 +89,9 @@ class decoder(tf.keras.Model):
     def __init__(self):
         super(decoder, self).__init__()
         self.input_module = [
-            layers.InceptionLayer(setting.num_conv_channel),
-            layers.InceptionLayer(setting.num_conv_channel),
-            layers.InceptionLayer(setting.num_conv_channel),
+            layers.CustomConv2D(setting.num_conv_channel),
+            layers.CustomConv2D(setting.num_conv_channel),
+            layers.CustomConv2D(setting.num_conv_channel),
             layers.CustomConv2D(setting.num_conv_channel)
         ]
         self.output_module = [
@@ -134,9 +134,9 @@ class authenticator(tf.keras.Model):
     def __init__(self):
         super(authenticator, self).__init__()
         self.module = [
-            layers.InceptionLayer(setting.num_conv_channel, scale_down_mode=1),
-            layers.InceptionLayer(setting.num_conv_channel, scale_down_mode=1),
-            layers.InceptionLayer(setting.num_conv_channel, scale_down_mode=1),
+            layers.CustomConv2D(setting.num_conv_channel, scale_down_mode=1),
+            layers.CustomConv2D(setting.num_conv_channel, scale_down_mode=1),
+            layers.CustomConv2D(setting.num_conv_channel, scale_down_mode=1),
             layers.CustomConv2D(1, batch_normalization=False,
                                 scale_down_mode=1, activation="linear")
         ]
