@@ -57,6 +57,8 @@ class GAN_worker():
             from_logits=True) for _ in range(setting.num_message_channel)]
         self.authenticator_loss = tf.keras.losses.BinaryCrossentropy(
             from_logits=True)
+        
+        self.gradient_penalty = layers.GradientPenalty
 
         self.compress_param = [
             int(cv2.IMWRITE_JPEG_LUMA_QUALITY), 85,
@@ -185,29 +187,27 @@ class GAN_worker():
 
     @tf.function
     def train_discriminator(self, batch, messages):
-        with tf.GradientTape() as discriminator_tape_true:
+        with tf.GradientTape() as discriminator_tape:
             discriminator_ouput_true = self.discriminator(batch, training=True)
 
-            discriminator_loss_true = self.get_discriminator_loss(
-                tf.ones_like(discriminator_ouput_true), discriminator_ouput_true)
-
-        discriminator_gradient = discriminator_tape_true.gradient(
-            discriminator_loss_true, self.discriminator.trainable_variables)
-        self.discriminator_opt.apply_gradients(
-            zip(discriminator_gradient, self.discriminator.trainable_variables))
-
-        with tf.GradientTape() as discriminator_tape_fake:
             output_image_valid = self.generator(batch, messages)
             output_image_invalid = self.generator(
                 batch, messages, random_key=True)
             discriminator_ouput_fake = self.discriminator(
                 tf.concat([output_image_valid, output_image_invalid], axis=0), training=True)
+            
+            gradient_penalty = self.gradient_penalty.call(self.discriminator, batch, output_image_valid)
+            gradient_penalty += self.gradient_penalty.call(self.discriminator, batch, output_image_invalid)
+            gradient_penalty /= 2
 
-            discriminator_loss_fake = self.get_discriminator_loss(
+            discriminator_loss = self.get_discriminator_loss(
+                tf.ones_like(discriminator_ouput_true), discriminator_ouput_true)
+            discriminator_loss += self.get_discriminator_loss(
                 tf.zeros_like(discriminator_ouput_fake), discriminator_ouput_fake)
+            discriminator_loss += gradient_penalty
 
-        discriminator_gradient = discriminator_tape_fake.gradient(
-            discriminator_loss_fake, self.discriminator.trainable_variables)
+        discriminator_gradient = discriminator_tape.gradient(
+            discriminator_loss, self.discriminator.trainable_variables)
         self.discriminator_opt.apply_gradients(
             zip(discriminator_gradient, self.discriminator.trainable_variables))
 
@@ -547,11 +547,11 @@ class GAN_worker():
 
     def plot(self):
         tf.keras.utils.plot_model(
-            self.generator.model(), "generator.png", show_shapes=True)
+            self.generator.model(), "generator.png", rankdir="TB", show_shapes=False, show_layer_names=False)
         tf.keras.utils.plot_model(
-            self.discriminator.model(), "discriminator.png", show_shapes=True)
+            self.discriminator.model(), "discriminator.png", rankdir="LR", show_shapes=False, show_layer_names=False)
         for index in range(setting.num_message_channel):
             tf.keras.utils.plot_model(self.decoders[index].model(
-            ), "decoder_"+str(index) + ".png", show_shapes=True)
+            ), "decoder_"+str(index) + ".png", rankdir="LR", show_shapes=False, show_layer_names=False)
         tf.keras.utils.plot_model(
-            self.authenticator.model(), "authenticator.png", show_shapes=True)
+            self.authenticator.model(), "authenticator.png", rankdir="LR", show_shapes=False, show_layer_names=False)

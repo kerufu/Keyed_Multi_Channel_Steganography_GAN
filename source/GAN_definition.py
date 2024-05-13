@@ -64,11 +64,11 @@ class discriminator(tf.keras.Model):
     def __init__(self):
         super(discriminator, self).__init__()
         self.module = [
-            layers.CustomConv2D(setting.num_conv_channel, clip_kernal=True),
-            layers.CustomConv2D(setting.num_conv_channel, clip_kernal=True),
-            layers.CustomConv2D(setting.num_conv_channel, clip_kernal=True),
+            layers.CustomConv2D(setting.num_conv_channel, batch_normalization=False, clip_kernal=False),
+            layers.CustomConv2D(setting.num_conv_channel, batch_normalization=False, clip_kernal=False),
+            layers.CustomConv2D(setting.num_conv_channel, batch_normalization=False, clip_kernal=False),
             layers.CustomConv2D(1, batch_normalization=False,
-                                scale_down_mode=1, clip_kernal=True, activation="linear")
+                                scale_down_mode=1, clip_kernal=False, activation="linear")
         ]
 
     def call(self, x, training=False):

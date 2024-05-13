@@ -3,83 +3,18 @@ import numpy as np
 
 import setting
 
-class ClassificationMetricSet(tf.keras.metrics.Metric):
-    def __init__(self, num_class, per_class=True, class_weights=1):
-        super(ClassificationMetricSet, self).__init__()
-        self.num_class = num_class
-        self.per_class = per_class
-        self.class_weights = tf.multiply(class_weights, self.num_class) / tf.math.reduce_sum(class_weights)
-        self.class_weights = tf.cast(self.class_weights, tf.float32)
-        self.tp = self.add_weight(
-            shape=(self.num_class,),
-            initializer='zeros',
-            name='tp'
-        )
-        self.fp = self.add_weight(
-            shape=(self.num_class,),
-            initializer='zeros',
-            name='fp'
-        )
-        self.tn = self.add_weight(
-            shape=(self.num_class,),
-            initializer='zeros',
-            name='tn'
-        )
-        self.fn = self.add_weight(
-            shape=(self.num_class,),
-            initializer='zeros',
-            name='fn'
-        )
-        self.label_count = self.add_weight(
-            shape=(self.num_class,),
-            initializer='zeros',
-            name='label_count'
-        )
-        self.prediction_count = self.add_weight(
-            shape=(self.num_class,),
-            initializer='zeros',
-            name='prediction_count'
-        )
+class GradientPenalty():
+    def call(discriminator, x_true, x_fake):
+        epsilon = tf.random.uniform([x_true.shape[0]]+[1]*(len(x_true.shape)-1), 0.0, 1.0)
+        x_mix = epsilon * tf.cast(x_true, tf.float32) + (1 - epsilon) * x_fake
+        with tf.GradientTape() as tape:
+            tape.watch(x_mix)
+            discriminator_score_mix = discriminator(x_mix)
+        gradients = tape.gradient(discriminator_score_mix, x_mix)
+        gradient_mean = tf.sqrt(tf.reduce_sum(gradients**2, axis=list(range(1, len(gradients.shape)))))
+        gradient_penalty = tf.reduce_mean((gradient_mean-1.0)**2)
+        return gradient_penalty
 
-    def logit_to_one_hot(self, logit):
-        return tf.one_hot(tf.argmax(logit, axis=1), depth=self.num_class)
-    
-    def reset_state(self):
-        for v in self.variables:
-            v.assign(tf.zeros(v.shape, dtype=v.dtype))
-
-    def update_state(self, labels, predictions):
-        label_index = tf.math.argmax(labels, axis=1)
-        prediction_index = tf.math.argmax(predictions, axis=1)
-        predictions = self.logit_to_one_hot(predictions)
-
-        self.label_count.assign(self.label_count+tf.reduce_sum(labels, axis=0))
-        self.prediction_count.assign(
-            self.prediction_count+tf.reduce_sum(predictions, axis=0))
-
-        match = tf.cast(tf.equal(label_index, prediction_index), tf.float32)
-        match = tf.expand_dims(match, axis=-1)
-
-        self.tp.assign(self.tp+tf.reduce_sum(match*labels, axis=0))
-        self.tn.assign(self.tn+tf.reduce_sum(match *
-                       np.ones((label_index.shape[0], self.num_class)), axis=0))
-        self.tn.assign(self.tn-tf.reduce_sum(match*labels, axis=0))
-        self.fp.assign(self.fp+tf.reduce_sum((1-match)*predictions, axis=0))
-        self.fn.assign(self.fn+tf.reduce_sum((1-match)*labels, axis=0))
-
-    def result(self):
-        accuracy = (self.tp + self.tn) / tf.math.reduce_sum(self.label_count)
-        precision = self.tp / self.prediction_count
-        recall = self.tp / self.label_count
-        f1_score = (2 * precision * recall) / (precision + recall)
-        if self.per_class:
-            return accuracy, precision, recall, f1_score
-        else:
-            accuracy *= self.class_weights
-            precision *= self.class_weights
-            recall *= self.class_weights
-            f1_score *= self.class_weights
-            return tf.math.reduce_mean(accuracy), tf.math.reduce_mean(precision), tf.math.reduce_mean(recall), tf.math.reduce_mean(f1_score)
 
 class HammingCode(tf.keras.layers.Layer):
     def __init__(self, decode_mode=False):
