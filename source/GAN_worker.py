@@ -58,7 +58,7 @@ class GAN_worker():
         self.authenticator_loss = tf.keras.losses.BinaryCrossentropy(
             from_logits=True)
         
-        self.gradient_penalty = layers.GradientPenalty
+        self.gradient_penalty = layers.GradientPenalty()
 
         self.compress_param = [
             int(cv2.IMWRITE_JPEG_LUMA_QUALITY), 85,

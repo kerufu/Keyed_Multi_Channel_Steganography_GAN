@@ -62,7 +62,7 @@ class botnet_worker():
 
         return command
 
-    def botnet_simulation(self, character_mapping=False, simulate_step=100000):
+    def voting_simulation(self, character_mapping=False, simulate_step=100000):
         if character_mapping:
             command_table = list(worker_pool.cm.mapping_table.keys())
         else:

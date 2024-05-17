@@ -4,7 +4,7 @@ import numpy as np
 import setting
 
 class GradientPenalty():
-    def call(discriminator, x_true, x_fake):
+    def call(self, discriminator, x_true, x_fake):
         epsilon = tf.random.uniform([x_true.shape[0]]+[1]*(len(x_true.shape)-1), 0.0, 1.0)
         x_mix = epsilon * tf.cast(x_true, tf.float32) + (1 - epsilon) * x_fake
         with tf.GradientTape() as tape:

@@ -8,8 +8,8 @@ dw.dataset = dw.dataset.shuffle(dw.dataset.cardinality()//setting.shuffle_buffer
 import GAN_worker
 ganw = GAN_worker.GAN_worker(setting.GAN_key)
 
-import character_mapper
-cm = character_mapper.character_mapper()
+import source.backward_code_selection as backward_code_selection
+cm = backward_code_selection.character_mapper()
 
 import botnet
 bw = botnet.botnet_worker()
