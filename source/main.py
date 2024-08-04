@@ -3,8 +3,8 @@ os.chdir("..")
 
 import worker_pool
 
-worker_pool.ganw.train(50000)
-# worker_pool.ganw.evaluate(coding_mode=0)
+# worker_pool.ganw.train(50000)
+worker_pool.ganw.evaluate(coding_mode=0)
 # worker_pool.ganw.plot()
 
 # worker_pool.bw.voting_simulation(character_mapping=False) # need modify EncryptionConcatenation
