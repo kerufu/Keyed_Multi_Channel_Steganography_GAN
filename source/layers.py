@@ -3,6 +3,19 @@ import numpy as np
 
 import setting
 
+class GradientPenalty():
+    def call(self, discriminator, x_true, x_fake):
+        epsilon = tf.random.uniform([x_true.shape[0]]+[1]*(len(x_true.shape)-1), 0.0, 1.0)
+        x_mix = epsilon * tf.cast(x_true, tf.float32) + (1 - epsilon) * x_fake
+        with tf.GradientTape() as tape:
+            tape.watch(x_mix)
+            discriminator_score_mix = discriminator(x_mix)
+        gradients = tape.gradient(discriminator_score_mix, x_mix)
+        gradient_mean = tf.sqrt(tf.reduce_sum(gradients**2, axis=list(range(1, len(gradients.shape)))))
+        gradient_penalty = tf.reduce_mean((gradient_mean-1.0)**2)
+        return gradient_penalty
+
+
 class HammingCode(tf.keras.layers.Layer):
     def __init__(self, decode_mode=False):
         super(HammingCode, self).__init__()
@@ -17,27 +30,31 @@ class HammingCode(tf.keras.layers.Layer):
                 bit_stream.append(np.array([-1]*setting.batch_size))
             else:
                 bit_vector = data_bits[:, data_index]
-                parity_ints = tf.bitwise.bitwise_xor(parity_ints, np.where(bit_vector==1, index+1, 0))
+                parity_ints = tf.bitwise.bitwise_xor(
+                    parity_ints, np.where(bit_vector == 1, index+1, 0))
                 bit_stream.append(bit_vector)
                 data_index += 1
 
         parity_bits = []
         for index in range(setting.batch_size):
-            bits = np.binary_repr(parity_ints[index], width=setting.parity_bit_size_per_window)
-            bits = np.fromstring(bits,'u1') - ord('0')
+            bits = np.binary_repr(
+                parity_ints[index], width=setting.parity_bit_size_per_window)
+            bits = np.fromstring(bits, 'u1') - ord('0')
             parity_bits.append(bits)
 
         bit_stream = np.array(bit_stream).T
         parity_bits = np.array(parity_bits)[:, ::-1]
 
         for index in range(setting.parity_bit_size_per_window):
-            bit_stream[:, setting.parity_indexes[index]] = parity_bits[:, index]
-        window_parity = np.expand_dims(np.logical_xor.reduce(bit_stream, axis=1), axis=1)
+            bit_stream[:, setting.parity_indexes[index]
+                       ] = parity_bits[:, index]
+        window_parity = np.expand_dims(
+            np.logical_xor.reduce(bit_stream, axis=1), axis=1)
         bit_stream = tf.concat(values=[window_parity, bit_stream], axis=1)
         bit_stream = np.array(bit_stream).astype(int)
 
         return bit_stream, parity_bits
-    
+
     def decode(self, bit_stream):
         window_parity = bit_stream[:, 0]
         bit_stream = bit_stream[:, 1:]
@@ -51,7 +68,8 @@ class HammingCode(tf.keras.layers.Layer):
         data_bits = np.array(data_bits).T
         recieved_parity_bits = np.array(recieved_parity_bits).T
         computed_bit_stream, computed_parity_bits = self.encode(data_bits)
-        possibly_single_error = np.where(window_parity!=computed_bit_stream[:, 0], True, False)
+        possibly_single_error = np.where(
+            window_parity != computed_bit_stream[:, 0], True, False)
 
         distance = [0] * setting.batch_size
         distance = np.array(distance)
@@ -59,22 +77,24 @@ class HammingCode(tf.keras.layers.Layer):
         temp_distance = np.array(temp_distance)
 
         for index in range(setting.parity_bit_size_per_window):
-            temp_distance += np.where((recieved_parity_bits[:, index]==computed_parity_bits[:, index]), 0, setting.parity_indexes[index]+1)
+            temp_distance += np.where((recieved_parity_bits[:, index] ==
+                                      computed_parity_bits[:, index]), 0, setting.parity_indexes[index]+1)
             if np.all(np.less(temp_distance, setting.data_bit_size_per_window)):
                 distance = temp_distance.copy()
         distance = np.where(possibly_single_error, distance, 0)
         for pi in setting.parity_indexes:
-            distance = np.where(distance==pi+1, 0, distance)
-        
+            distance = np.where(distance == pi+1, 0, distance)
+
         if not np.array_equal(distance, 0):
             offset = [1] * setting.batch_size
             offset = np.array(offset)
             for pi in setting.parity_indexes:
-                offset += np.where(pi+1<distance, 1, 0)
+                offset += np.where(pi+1 < distance, 1, 0)
             distance -= offset
             for index in range(setting.batch_size):
                 if distance[index] >= 0:
-                    data_bits[index, distance[index]] = 1 - data_bits[index, distance[index]]
+                    data_bits[index, distance[index]] = 1 - \
+                        data_bits[index, distance[index]]
 
         return data_bits
 
@@ -83,110 +103,100 @@ class HammingCode(tf.keras.layers.Layer):
 
         if self.decode_mode:
             for index in range(setting.num_of_window_per_channel):
-                bs = bit_stream[:, setting.coding_window_size*index:setting.coding_window_size*(index+1)]
+                bs = bit_stream[:, setting.coding_window_size *
+                                index:setting.coding_window_size*(index+1)]
                 db = self.decode(bs)
                 result.append(db)
             if setting.residual_bits_size:
                 result.append(bit_stream[:, -setting.residual_bits_size:])
         else:
             for index in range(setting.num_of_window_per_channel):
-                bs = bit_stream[:, setting.data_bit_size_per_window*index:setting.data_bit_size_per_window*(index+1)]
+                bs = bit_stream[:, setting.data_bit_size_per_window *
+                                index:setting.data_bit_size_per_window*(index+1)]
                 ebs, pb = self.encode(bs)
                 result.append(ebs)
             if setting.residual_bits_size:
                 result.append(bit_stream[:, -setting.residual_bits_size:])
-        
+
         result = tf.concat(result, axis=1)
         result = np.array(result).astype(int)
         return result
+
 
 class WassersteinLoss(tf.keras.losses.Loss):
     def call(self, y_true, y_pred):
         y_true = y_true * 2 - 1
         return -tf.math.reduce_mean(y_true*y_pred)
 
+
 class HardTanh(tf.keras.layers.Layer):
     def call(self, x):
         return tf.minimum(tf.maximum(x, -1), 1)
+
 
 class HardSwish(tf.keras.layers.Layer):
     def call(self, x):
         return x * tf.minimum(tf.maximum(x+3, 0), 6) / 6
 
+
 class ClipConstraint(tf.keras.constraints.Constraint):
     def __call__(self, weights):
         return tf.keras.backend.clip(weights, -setting.kernal_clip_value, setting.kernal_clip_value)
-    
+
     def get_config(self):
         return {'kernal_clip_value': setting.kernal_clip_value}
 
-class EncrypteMessage(tf.keras.layers.Layer):
-    def __init__(self, key, xor=True):
-        super(EncrypteMessage, self).__init__()
-        self.xor = xor
 
-        self.key = tf.repeat(key, repeats=setting.image_size//setting.key_size, axis=0)
-        self.key = tf.repeat([self.key], repeats=setting.image_size//setting.num_message_channel, axis=0)
-        self.key = tf.repeat([self.key], repeats=setting.message_bit_per_pixel, axis=0)
-        self.key = tf.reshape(self.key, [-1])
+class EncryptionConcatenation(tf.keras.layers.Layer):
+    def __init__(self, key):
+        super(EncryptionConcatenation, self).__init__()
+        self.key = self.expand_key(key)
+        self.message_reshape = tf.keras.layers.Reshape(
+            (setting.image_size, setting.image_size, setting.message_bit_per_pixel))
 
-        if not self.xor:
-            self.key = tf.repeat([self.key], repeats=setting.batch_size, axis=0)
-            self.key = tf.cast(self.key, tf.float32) - 0.5
+    def expand_key(self, key):
+        key = tf.repeat(key, repeats=setting.image_size //
+                        setting.key_size, axis=0)
+        key = tf.repeat([key], repeats=setting.image_size, axis=0)
+        key = tf.repeat([key], repeats=setting.message_bit_per_pixel, axis=0)
+        key = tf.repeat([key], repeats=setting.batch_size, axis=0)
+        key = tf.transpose(key, [0, 2, 3, 1])
+        return key
 
-    def call(self, message):
-        if self.xor:
-            message = tf.bitwise.bitwise_xor(message, self.key)
+    def call(self, image, messages, random_key):
+        if random_key:
+            key = tf.random.categorical(tf.math.log(
+                [[0.5, 0.5]]), setting.key_size)[0]
+            key = self.expand_key(key)
+            if tf.math.reduce_all(tf.math.equal(key, self.key)):
+                key = tf.bitwise.bitwise_xor(key, tf.ones_like(key))
+        else:
+            key = self.key
 
-        message = tf.cast(message, tf.float32)
-        message = message * 2 - 1
-
-        if not self.xor:
-            message = message + self.key
-
-        return message
-
-class MaskFeature(tf.keras.layers.Layer):
-    def __init__(self, mask):
-        super(MaskFeature, self).__init__()
-        self.mask = tf.repeat(mask, repeats=setting.image_size//setting.key_size)
-        self.mask = tf.repeat([self.mask], repeats=setting.image_size)
-        self.mask = tf.repeat([self.mask], repeats=setting.batch_size, axis=0)
-        self.mask = tf.convert_to_tensor(mask, dtype=tf.float32)
-        self.mask -= 0.5
-
-    def call(self, feature):
-        feature = feature * 2 - 1
-        feature = self.mask + feature
-        return feature
-
-class ImageMessageConcatenation(tf.keras.layers.Layer):
-    
-    def __init__(self):
-        super(ImageMessageConcatenation, self).__init__()
-        self.message_module = [
-            tf.keras.layers.Reshape((setting.image_size, setting.image_size, setting.message_bit_per_pixel))
-        ]
-
-    def call(self, image, messages):
         messages = tf.concat(messages, 1)
-        for mm in self.message_module:
-            messages = mm(messages)
+        messages = self.message_reshape(messages)
+        messages = tf.bitwise.bitwise_xor(messages, key)
+        messages = tf.concat([messages, key], -1)
+        messages = tf.cast(messages, tf.float32)
+        messages = messages * 2 - 1
+
         return tf.concat([image, messages], -1)
 
-class ReflectRadding(tf.keras.layers.Layer): # O=[(W−K+P)/S]+1
-    def __init__(self):
+
+class ReflectRadding(tf.keras.layers.Layer):  # O=[(W−K+P)/S]+1
+    def __init__(self, kernal_size=setting.kernal_size):
         super(ReflectRadding, self).__init__()
-        pad = setting.kernal_size - 1
+        pad = kernal_size - 1
         self.upper_pad = pad // 2
         self.lower_pad = pad - self.upper_pad
 
     def call(self, x):
         return tf.pad(x, [[0, 0], [self.upper_pad, self.lower_pad], [self.upper_pad, self.lower_pad], [0, 0]], 'REFLECT')
 
+
 class CustomConv2D(tf.keras.layers.Layer):
 
-    def __init__(self, num_channel, batch_normalization=True, enable_regularization=True, reflect_padding=False, scale_down_mode=0, clip_kernal=False, activation="hswish", enable_dropout=False, depthwise_seperable=False):
+    def __init__(self, num_channel, kernal_size=setting.kernal_size, batch_normalization=True, enable_regularization=True, reflect_padding=False, scale_down_mode=0, clip_kernal=False, activation="hswish", enable_dropout=False, depthwise_seperable=False):
         super(CustomConv2D, self).__init__()
 
         kernel_constraint = None
@@ -205,32 +215,38 @@ class CustomConv2D(tf.keras.layers.Layer):
         if reflect_padding:
             if scale_down_mode == 0:
                 self.module = [
-                    ReflectRadding(),
-                    Conv2D(num_channel, setting.kernal_size, kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
+                    ReflectRadding(kernal_size),
+                    Conv2D(num_channel, kernal_size,
+                           kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
                 ]
             elif scale_down_mode == 1:
                 self.module = [
-                    ReflectRadding(),
-                    Conv2D(num_channel, setting.kernal_size, strides=2, kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
+                    ReflectRadding(kernal_size),
+                    Conv2D(num_channel, kernal_size, strides=2,
+                           kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
                 ]
             elif scale_down_mode == 2:
                 self.module = [
-                    ReflectRadding(),
-                    Conv2D(num_channel, setting.kernal_size, kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
+                    ReflectRadding(kernal_size),
+                    Conv2D(num_channel, kernal_size,
+                           kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
                     tf.keras.layers.MaxPool2D(),
                 ]
         else:
             if scale_down_mode == 0:
                 self.module = [
-                    Conv2D(num_channel, setting.kernal_size, padding='same', kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
+                    Conv2D(num_channel, kernal_size, padding='same',
+                           kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
                 ]
             elif scale_down_mode == 1:
                 self.module = [
-                    Conv2D(num_channel, setting.kernal_size, strides=2, padding='same', kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
+                    Conv2D(num_channel, kernal_size, strides=2, padding='same',
+                           kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
                 ]
             elif scale_down_mode == 2:
                 self.module = [
-                    Conv2D(num_channel, setting.kernal_size, padding='same', kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
+                    Conv2D(num_channel, kernal_size, padding='same',
+                           kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
                     tf.keras.layers.MaxPool2D(),
                 ]
         if batch_normalization:
@@ -242,7 +258,7 @@ class CustomConv2D(tf.keras.layers.Layer):
             self.module.append(HardTanh())
         else:
             self.module.append(tf.keras.layers.Activation(activation))
-            
+
         if enable_dropout and setting.dropout_ratio:
             self.module.append(tf.keras.layers.Dropout(setting.dropout_ratio))
 
@@ -253,6 +269,7 @@ class CustomConv2D(tf.keras.layers.Layer):
             else:
                 x = layer(x)
         return x
+
 
 class CustomDense(tf.keras.layers.Layer):
 
@@ -268,7 +285,8 @@ class CustomDense(tf.keras.layers.Layer):
             kernel_regularizer = tf.keras.regularizers.L1L2()
 
         self.module = [
-            tf.keras.layers.Dense(output_size, kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
+            tf.keras.layers.Dense(
+                output_size, kernel_regularizer=kernel_regularizer, kernel_constraint=kernel_constraint),
         ]
         if batch_normalization:
             self.module.append(tf.keras.layers.BatchNormalization())
@@ -289,15 +307,18 @@ class CustomDense(tf.keras.layers.Layer):
                 x = layer(x)
         return x
 
+
 class CustomFlatten(tf.keras.layers.Layer):
     def __init__(self, output_size):
         super(CustomFlatten, self).__init__()
-        num_outpt_layers = np.ceil(np.log2(setting.image_size))
-        flatten_step = int(np.power(output_size/setting.num_conv_channel, 1/num_outpt_layers))
+        num_flatten_layers = int(np.ceil(np.log2(setting.image_size)))
+        flatten_step = np.power(
+            output_size/setting.num_conv_channel, 1/num_flatten_layers)
         self.output_module = [
-            CustomConv2D(setting.num_conv_channel*(flatten_step**(index+1)), scale_down_mode=2, depthwise_seperable=True) for index in range(num_outpt_layers-1)
+            CustomConv2D(int(setting.num_conv_channel*(flatten_step**(index+1))), scale_down_mode=1) for index in range(num_flatten_layers-1)
         ]
-        self.output_module.append(CustomConv2D(output_size, batch_normalization=False, activation="linear", scale_down_mode=1), depthwise_seperable=True)
+        self.output_module.append(CustomConv2D(
+            output_size, batch_normalization=False, activation="linear", scale_down_mode=1))
         self.output_module.append(tf.keras.layers.Flatten())
 
     def call(self, x, training):
@@ -307,3 +328,27 @@ class CustomFlatten(tf.keras.layers.Layer):
             else:
                 x = layer(x)
         return x
+
+
+class InceptionLayer(tf.keras.layers.Layer):
+    def __init__(self, num_channel, num_kernal=3, batch_normalization=True, enable_regularization=True,
+                 reflect_padding=False, scale_down_mode=0, clip_kernal=False, activation="hswish",
+                 enable_dropout=False, depthwise_seperable=False):
+        super(InceptionLayer, self).__init__()
+
+        if num_channel % num_kernal:
+            self.conv2d_cluster = [CustomConv2D(num_channel//num_kernal+num_channel % num_kernal, setting.kernal_size, batch_normalization, enable_regularization,
+                                                reflect_padding, scale_down_mode, clip_kernal, activation, enable_dropout, depthwise_seperable)]
+        else:
+            self.conv2d_cluster = [CustomConv2D(num_channel//num_kernal, setting.kernal_size, batch_normalization, enable_regularization,
+                                                reflect_padding, scale_down_mode, clip_kernal, activation, enable_dropout, depthwise_seperable)]
+        for k in range(1, num_kernal):
+            self.conv2d_cluster.append(CustomConv2D(num_channel//num_kernal, setting.kernal_size+k, batch_normalization, enable_regularization,
+                                                    reflect_padding, scale_down_mode, clip_kernal, activation,
+                                                    enable_dropout, depthwise_seperable))
+
+    def call(self, x, training):
+        output = []
+        for layer in self.conv2d_cluster:
+            output.append(layer(x, training))
+        return tf.concat(output, -1)

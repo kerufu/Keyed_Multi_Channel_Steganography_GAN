@@ -1,0 +1,1 @@
+docker cp fer:/fer/ste/saved_model .

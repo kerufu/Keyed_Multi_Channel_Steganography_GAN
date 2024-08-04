@@ -3,6 +3,9 @@ processed_dataset
 saved_model
 env
 archived_model
+generated
+source/test.py
+source/__pycache__
 
 *.png
 *.jpg

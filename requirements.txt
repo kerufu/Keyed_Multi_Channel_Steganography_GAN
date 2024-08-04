@@ -1,5 +1,7 @@
 opencv-python
 numpy
-tensorflow
+tensorflow==2.14.1
 tweepy
 wget
+matplotlib
+image-similarity-measures
